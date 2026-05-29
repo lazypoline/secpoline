@@ -1,0 +1,3 @@
+#define NUM_SYSCALLS    100000000
+#define SYSCALL_NO      500
+#define USE_CALL_RAX	0

@@ -1,0 +1,5 @@
+{
+  "base_loader_path": "/lib64/ld-linux-x86-64.so.2",
+  "secpoline_loader_path": "/home/ruben-sturm/lazypoline/output/libloader.so",
+  "secpoline_path": "/home/ruben-sturm/lazypoline/output/secpoline"
+}
