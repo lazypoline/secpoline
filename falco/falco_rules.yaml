@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2025 The Falco Authors.
+#
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Information about rules tags and fields can be found here: https://falco.org/docs/rules/#tags-for-current-falco-ruleset
+# The initial item in the `tags` fields reflects the maturity level of the rules introduced upon the proposal https://github.com/falcosecurity/rules/blob/main/proposals/20230605-rules-adoption-management-maturity-framework.md
+# `tags` fields also include information about the type of workload inspection (host and/or container), and Mitre Attack killchain phases and Mitre TTP code(s)
+# Mitre Attack References:
+# [1] https://attack.mitre.org/tactics/enterprise/
+# [2] https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json
+
+# Starting with version 8, the Falco engine supports exceptions.
+# However the Falco rules file does not use them by default.
+- required_engine_version: 0.57.0
+
+- required_plugin_versions:
+    - name: secpoline
+      version: 0.1.0
+
+- macro: proc_name_exists
+  condition: (not proc.name in ("<NA>","N/A"))
+
+- macro: known_ptrace_procs
+  condition: (proc.name in (known_ptrace_binaries))
+
+- macro: ptrace_attach_or_injection
+  condition: >
+    (evt.type=ptrace and
+    (evt.arg.request contains PTRACE_POKETEXT or
+    evt.arg.request contains PTRACE_POKEDATA or
+    evt.arg.request contains PTRACE_ATTACH or
+    evt.arg.request contains PTRACE_SEIZE or
+    evt.arg.request contains PTRACE_SETREGS))
+
+- rule: PTRACE attached to process
+  desc: >
+    Detect an attempt to inject potentially malicious code into a process using PTRACE in order to evade
+    process-based defenses or elevate privileges. Common anti-patterns are debuggers. Additionally, profiling
+    your environment via the known_ptrace_procs template macro can reduce noise.
+    A successful ptrace syscall generates multiple logs at once.
+  condition: >
+    ptrace_attach_or_injection
+    and proc_name_exists
+    and not known_ptrace_procs
+  output: Detected ptrace PTRACE_ATTACH attempt | proc_pcmdline=%proc.pcmdline evt_type=%evt.type user=%user.name user_uid=%user.uid user_loginuid=%user.loginuid process=%proc.name proc_exepath=%proc.exepath parent=%proc.pname command=%proc.cmdline terminal=%proc.tty
+  priority: WARNING
+  tags: [maturity_stable, host, container, process, mitre_privilege_escalation, T1055.008]
+
+
+
+- rule: test_secpoline_rule
+  desc: check if the application is becomming a ptracer
+  condition: secpoline.syscall_num = 101
+  output: ptrace activity detected!!!!!
+  priority: WARNING
+  source: secpoline
+

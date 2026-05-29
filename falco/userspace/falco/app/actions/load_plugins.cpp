@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: Apache-2.0
+/*
+Copyright (C) 2023 The Falco Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+#include "actions.h"
+#include <libsinsp/plugin_manager.h>
+
+using namespace falco::app;
+using namespace falco::app::actions;
+
+falco::app::run_result falco::app::actions::load_plugins(falco::app::state& s) {
+#if defined(MUSL_OPTIMIZED) or defined(__EMSCRIPTEN__)
+	if(!s.config->m_plugins.empty()) {
+		return run_result::fatal(
+		        "Loading plugins dynamic libraries is not supported by this Falco build");
+	}
+#endif
+	// Initialize the set of loaded event sources.
+	// By default, the set includes the 'syscall' event source
+	state::source_info syscall_src_info;
+	syscall_src_info.filterchecks = std::make_shared<sinsp_filter_check_list>();
+	s.source_infos.clear();
+	s.source_infos.insert(syscall_src_info, falco_common::syscall_source);
+	s.loaded_sources = {falco_common::syscall_source};
+
+	// Initialize map of plugin configs
+	s.plugin_configs.clear();
+
+	// Initialize the offline inspector. This is used to load all the configured
+	// plugins in order to have them available every time we need to access
+	// their static info. If Falco is in capture mode, this inspector is also
+	// used to open and read the trace file
+	s.offline_inspector = std::make_shared<sinsp>();
+
+	// Load all the configured plugins
+	for(auto& p : s.config->m_plugins) {
+		auto plugin = s.offline_inspector->register_plugin(p.m_library_path);
+		s.plugin_configs.insert(p, plugin->name());
+		falco_logger::log(falco_logger::level::INFO,
+		                  "Loaded plugin '" + p.m_name + "@" +
+		                          plugin->plugin_version().as_string() + "' from file " +
+		                          p.m_library_path + "\n");
+		if((plugin->caps() & CAP_SOURCING) == 0 || plugin->id() == 0) {
+			continue;
+		}
+		// Account the plugin event source
+		state::source_info src_info;
+		src_info.filterchecks = std::make_shared<filter_check_list>();
+		auto src_name = plugin->event_source();
+		s.source_infos.insert(src_info, src_name);
+		// note: this avoids duplicate values
+		if(std::find(s.loaded_sources.begin(), s.loaded_sources.end(), src_name) ==
+		   s.loaded_sources.end()) {
+			s.loaded_sources.push_back(src_name);
+		}
+	}
+
+	return run_result::ok();
+}

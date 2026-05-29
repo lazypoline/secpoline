@@ -1,0 +1,141 @@
+# This is a reusable workflow used by master and release CI
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The Falco version to use when publishing packages
+        required: true
+        type: string
+      bucket_suffix:
+        description: bucket suffix for packages
+        required: false
+        default: ''
+        type: string
+       
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_S3_REGION: eu-west-1
+  AWS_CLOUDFRONT_DIST_ID: E1CQNPFWRXLGQD
+
+jobs:
+  publish-packages:
+    runs-on: ubuntu-latest
+    container: docker.io/library/fedora:38
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+    
+      - name: Install dependencies
+        run: |
+          dnf install rpm-sign expect which createrepo gpg python python-pip -y
+          pip install awscli==1.29.60
+
+      # Configure AWS role; see https://github.com/falcosecurity/test-infra/pull/1102
+      # Note: master CI can only push dev packages as we have 2 different roles for master and release.
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
+        with:
+          role-to-assume: "arn:aws:iam::292999226676:role/github_actions-falco${{ inputs.bucket_suffix }}-s3"
+          aws-region: ${{ env.AWS_S3_REGION }}    
+          
+      - name: Download RPM x86_64
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: falco-${{ inputs.version }}-x86_64.rpm
+          path: /tmp/falco-build-rpm
+
+      - name: Download RPM aarch64
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: falco-${{ inputs.version }}-aarch64.rpm
+          path: /tmp/falco-build-rpm
+
+      - name: Download binary x86_64
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: falco-${{ inputs.version }}-x86_64.tar.gz
+          path: /tmp/falco-build-bin
+
+      - name: Download binary aarch64
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: falco-${{ inputs.version }}-aarch64.tar.gz
+          path: /tmp/falco-build-bin
+
+      - name: Download static binary x86_64
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: falco-${{ inputs.version }}-static-x86_64.tar.gz
+          path: /tmp/falco-build-bin-static
+
+      - name: Download WASM package
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: falco-${{ inputs.version }}-wasm.tar.gz
+          path: /tmp/falco-wasm
+
+      - name: Import gpg key
+        env:
+          GPG_KEY: ${{ secrets.GPG_KEY }}
+        run: printenv GPG_KEY | gpg --import -
+
+      - name: Publish wasm
+        run: |
+          ./scripts/publish-wasm -f /tmp/falco-wasm/falco-${{ inputs.version }}-wasm.tar.gz
+          
+      - name: Publish rpm
+        run: |
+          ./scripts/publish-rpm -f /tmp/falco-build-rpm/falco-${{ inputs.version }}-x86_64.rpm -f /tmp/falco-build-rpm/falco-${{ inputs.version }}-aarch64.rpm -r rpm${{ inputs.bucket_suffix }}
+      
+      - name: Publish bin
+        run: |
+          ./scripts/publish-bin -f /tmp/falco-build-bin/falco-${{ inputs.version }}-x86_64.tar.gz -r bin${{ inputs.bucket_suffix }} -a x86_64
+          ./scripts/publish-bin -f /tmp/falco-build-bin/falco-${{ inputs.version }}-aarch64.tar.gz -r bin${{ inputs.bucket_suffix }} -a aarch64
+          
+      - name: Publish static
+        run: |
+          ./scripts/publish-bin -f /tmp/falco-build-bin-static/falco-${{ inputs.version }}-static-x86_64.tar.gz -r bin${{ inputs.bucket_suffix }} -a x86_64
+
+  publish-packages-deb:
+    runs-on: ubuntu-latest
+    container: docker.io/debian:stable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+    
+      - name: Install dependencies
+        run: |
+          apt update -y
+          apt-get install apt-utils bzip2 gpg awscli -y
+      
+      # Configure AWS role; see https://github.com/falcosecurity/test-infra/pull/1102
+      # Note: master CI can only push dev packages as we have 2 different roles for master and release.
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@010d0da01d0b5a38af31e9c3470dbfdabdecca3a # v4.0.1
+        with:
+          role-to-assume: "arn:aws:iam::292999226676:role/github_actions-falco${{ inputs.bucket_suffix }}-s3"
+          aws-region: ${{ env.AWS_S3_REGION }}     
+      
+      - name: Download deb x86_64
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: falco-${{ inputs.version }}-x86_64.deb
+          path: /tmp/falco-build-deb
+
+      - name: Download deb aarch64
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: falco-${{ inputs.version }}-aarch64.deb
+          path: /tmp/falco-build-deb
+
+      - name: Import gpg key 
+        env:
+          GPG_KEY: ${{ secrets.GPG_KEY }}
+        run: printenv GPG_KEY | gpg --import -
+          
+      - name: Publish deb
+        run: |
+          ./scripts/publish-deb -f /tmp/falco-build-deb/falco-${{ inputs.version }}-x86_64.deb -f /tmp/falco-build-deb/falco-${{ inputs.version }}-aarch64.deb -r deb${{ inputs.bucket_suffix }}

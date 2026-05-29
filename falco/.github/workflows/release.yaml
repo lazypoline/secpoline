@@ -1,0 +1,203 @@
+name: Release Packages and Docker images
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+# Checks if any concurrent jobs is running for release CI and eventually cancel it.
+concurrency:
+  group: ci-release
+  cancel-in-progress: true
+
+jobs:
+  release-settings:
+    runs-on: ubuntu-latest
+    outputs:
+      is_latest: ${{ steps.get_settings.outputs.is_latest }}
+      bucket_suffix: ${{ steps.get_settings.outputs.bucket_suffix }}
+    steps:
+      - name: Get latest release
+        uses: rez0n/actions-github-release@27a57820ee808f8fd940c8a9d1f7188f854aa2b5 # v2.0
+        id: latest_release
+        env:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          type: "stable"
+
+      - name: Get settings for this release
+        id: get_settings
+        shell: python
+        run: |
+          import os
+          import re
+          import sys
+
+          semver_no_meta = '''^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?$'''
+          tag_name = '${{ github.event.release.tag_name }}'
+
+          is_valid_version = re.match(semver_no_meta, tag_name) is not None
+          if not is_valid_version:
+            print(f'Release version {tag_name} is not a valid full or pre-release. See RELEASE.md for more information.')
+            sys.exit(1)
+
+          is_prerelease = '-' in tag_name
+
+          # Safeguard: you need to both set "latest" in GH and not have suffixes to overwrite latest
+          is_latest = '${{ steps.latest_release.outputs.release }}' == tag_name and not is_prerelease
+
+          bucket_suffix = '-dev' if is_prerelease else ''
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as ofp:
+            print(f'is_latest={is_latest}'.lower(), file=ofp)
+            print(f'bucket_suffix={bucket_suffix}', file=ofp)
+
+  build-packages:
+    needs: [release-settings]
+    uses: ./.github/workflows/reusable_build_packages.yaml
+    with:
+      arch: x86_64
+      version: ${{ github.event.release.tag_name }}
+      use_jemalloc: true
+    secrets: inherit
+
+  build-packages-arm64:
+    needs: [release-settings]
+    uses: ./.github/workflows/reusable_build_packages.yaml
+    with:
+      arch: aarch64
+      version: ${{ github.event.release.tag_name }}
+      use_jemalloc: true
+    secrets: inherit
+
+  test-packages:
+    needs: [release-settings, build-packages]
+    uses: ./.github/workflows/reusable_test_packages.yaml
+    # See https://github.com/falcosecurity/falco/pull/3482
+    # Since musl build does not support dynamically loaded plugins,
+    # many tests would fail (the ones using `container.foo` fields).
+    # Disable tests on static builds for now.
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        static: ["static", ""]
+    with:
+      arch: x86_64
+#      static: ${{ matrix.static != '' && true || false }}
+      version: ${{ github.event.release.tag_name }}
+
+  test-packages-arm64:
+    needs: [release-settings, build-packages-arm64]
+    uses: ./.github/workflows/reusable_test_packages.yaml
+    with:
+      arch: aarch64
+      version: ${{ github.event.release.tag_name }}
+
+  publish-packages:
+    needs: [release-settings, test-packages, test-packages-arm64]
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/reusable_publish_packages.yaml
+    with:
+      bucket_suffix: ${{ needs.release-settings.outputs.bucket_suffix }}
+      version: ${{ github.event.release.tag_name }}
+    secrets: inherit
+
+  # Both build-docker and its arm64 counterpart require build-packages because they use its output
+  build-docker:
+    needs: [release-settings, build-packages, publish-packages]
+    uses: ./.github/workflows/reusable_build_docker.yaml
+    with:
+      arch: x86_64
+      bucket_suffix: ${{ needs.release-settings.outputs.bucket_suffix }}
+      version: ${{ github.event.release.tag_name }}
+      tag: ${{ github.event.release.tag_name }}
+    secrets: inherit
+
+  build-docker-arm64:
+    needs: [release-settings, build-packages, publish-packages]
+    uses: ./.github/workflows/reusable_build_docker.yaml
+    with:
+      arch: aarch64
+      bucket_suffix: ${{ needs.release-settings.outputs.bucket_suffix }}
+      version: ${{ github.event.release.tag_name }}
+      tag: ${{ github.event.release.tag_name }}
+    secrets: inherit
+
+  publish-docker:
+    needs: [release-settings, build-docker, build-docker-arm64]
+    permissions:
+      attestations: write
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/reusable_publish_docker.yaml
+    secrets: inherit
+    with:
+      is_latest: ${{ needs.release-settings.outputs.is_latest == 'true' }}
+      tag: ${{ github.event.release.tag_name }}
+      sign: true
+
+  release-body:
+    needs: [release-settings, publish-docker]
+    if: ${{ needs.release-settings.outputs.is_latest == 'true' }} # only for latest releases
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repo
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+
+      - name: Extract LIBS and DRIVER versions
+        run: |
+          cp .github/release_template.md release-body.md
+          LIBS_VERS=$(cat cmake/modules/falcosecurity-libs.cmake | grep 'set(FALCOSECURITY_LIBS_VERSION' | tail -n1 | grep -o '[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*')
+          DRIVER_VERS=$(cat cmake/modules/driver.cmake | grep 'set(DRIVER_VERSION' | tail -n1 | grep -o '[[:digit:]]*\.[[:digit:]]*\.[[:digit:]]*+driver')
+          sed -i s/LIBSVER/$LIBS_VERS/g release-body.md
+          sed -i s/DRIVERVER/$DRIVER_VERS/g release-body.md
+
+      - name: Append release matrixes
+        run: |
+          sed -i s/FALCOBUCKET/${{ needs.release-settings.outputs.bucket_suffix }}/g release-body.md
+          sed -i s/FALCOVER/${{ github.event.release.tag_name }}/g release-body.md
+
+      - name: Generate release notes
+        uses: leodido/rn2md@9c351d81278644c0e17b1ca68edbdba305276c73
+        with:
+          milestone: ${{ github.event.release.tag_name }}
+          output: ./notes.md
+
+      - name: Merge release notes to pre existent body
+        run: cat notes.md >> release-body.md
+
+      - name: Attach release creator to release body
+        run: |
+          echo "" >> release-body.md
+          echo "#### Release Manager @${{ github.event.release.author.login }}" >> release-body.md
+
+      - name: Download debug symbols for Falco x86_64
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: falco-${{ github.event.release.tag_name }}-x86_64.debug
+
+      - name: Rename x86_64 debug symbols
+        run: mv falco.debug falco-x86_64.debug
+
+      - name: Download debug symbols for Falco aarch64
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: falco-${{ github.event.release.tag_name }}-aarch64.debug
+
+      - name: Rename aarch64 debug symbols
+        run: mv falco.debug falco-aarch64.debug
+
+      - name: Release
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v0.1.15
+        with:
+          body_path: ./release-body.md
+          tag_name: ${{ github.event.release.tag_name }}
+          name: ${{ github.event.release.name }}
+          files: |
+            falco-x86_64.debug
+            falco-aarch64.debug

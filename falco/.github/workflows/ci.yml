@@ -1,0 +1,157 @@
+name: CI Build
+on:
+  pull_request:
+    branches:
+      - master
+      - release/*
+  workflow_dispatch:
+
+# Checks if any concurrent jobs under the same pull request or branch are being executed
+# NOTE: this will cancel every workflow that is being ran against a PR as group is just the github ref (without the workflow name)
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true  
+
+permissions:  
+  contents: read
+  
+jobs:
+  fetch-version:
+    uses: ./.github/workflows/reusable_fetch_version.yaml
+
+  build-dev-packages-x86_64:
+    needs: [fetch-version]
+    uses: ./.github/workflows/reusable_build_packages.yaml
+    with:
+      arch: x86_64
+      version: ${{ needs.fetch-version.outputs.version }}
+      enable_debug: true
+      enable_sanitizers: true
+      use_mimalloc: true
+
+  build-dev-packages-arm64:
+    needs: [fetch-version]
+    uses: ./.github/workflows/reusable_build_packages.yaml
+    with:
+      arch: aarch64
+      version: ${{ needs.fetch-version.outputs.version }}
+      enable_debug: true
+      use_mimalloc: true
+
+  test-dev-packages:
+    needs: [fetch-version, build-dev-packages-x86_64]
+    uses: ./.github/workflows/reusable_test_packages.yaml
+    # See https://github.com/falcosecurity/falco/pull/3482
+    # Since musl build does not support dynamically loaded plugins,
+    # many tests would fail (the ones using `container.foo` fields).
+    # Disable tests on static builds for now.
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        static: ["static", ""]
+    with:
+      arch: x86_64
+#      sanitizers: ${{ matrix.static == '' && true || false }}
+      sanitizers: true
+#      static: ${{ matrix.static != '' && true || false }}
+      version: ${{ needs.fetch-version.outputs.version }}
+
+  test-dev-packages-arm64:
+    needs: [fetch-version, build-dev-packages-arm64]
+    uses: ./.github/workflows/reusable_test_packages.yaml
+    with:
+      arch: aarch64
+      version: ${{ needs.fetch-version.outputs.version }}
+
+  build-dev-minimal:
+    uses: ./.github/workflows/reusable_build_dev.yaml
+    with:
+      arch: x86_64
+      git_ref: ${{ github.event.pull_request.head.sha }}
+      minimal: true
+      build_type: Debug
+
+  build-dev-minimal-arm64:
+    uses: ./.github/workflows/reusable_build_dev.yaml
+    with:
+      arch: aarch64
+      git_ref: ${{ github.event.pull_request.head.sha }}
+      minimal: true
+      build_type: Debug
+
+  # builds using system deps, checking out the PR's code
+  # note: this also runs a command that generates an output of form: "<engine_version> <some_hash>",
+  # of which <some_hash> is computed by hashing in order the following:
+  # - Driver schema version supported by the built-in falcosecurity/libs
+  # - The supported event types usable in Falco rules (evt.type=xxx)
+  # - The supported rules fields with their name, type, and description
+  build-dev:
+    uses: ./.github/workflows/reusable_build_dev.yaml
+    with:
+      arch: x86_64
+      git_ref: ${{ github.event.pull_request.head.sha }}
+      minimal: false
+      sanitizers: true
+      build_type: Debug
+      cmd: "echo $(build/userspace/falco/falco -c ./falco.yaml --version | grep 'Engine:' | awk '{print $2}') $(echo $(build/userspace/falco/falco -c ./falco.yaml --version | grep 'Schema version:' | awk '{print $3}') $(build/userspace/falco/falco -c ./falco.yaml --list --markdown | grep '^`' | sort) $(build/userspace/falco/falco -c ./falco.yaml --list-events | sort) | sha256sum)"
+
+  # checks the falco engine checksum for consistency
+  check-engine-checksum:
+    runs-on: ubuntu-latest
+    needs: [build-dev]
+    steps:    
+      - name: Checkout PR head ref
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Check Engine checksum
+        run: |
+          prev_hash=$(grep CHECKSUM "./userspace/engine/falco_engine_version.h" | awk '{print $3}' | sed -e 's/"//g')
+          cur_hash=$(echo "${{ needs.build-dev.outputs.cmdout }}" | cut -d ' ' -f 2)
+          
+          echo "encoded checksum: $prev_hash"
+          echo "current checksum: $cur_hash"
+          if [ $prev_hash != $cur_hash ]; then
+            echo "current engine checksum differs from the one encoded in userspace/engine/falco_engine_version.h"
+            exit 1
+          else
+            echo "current and encoded engine checksum are matching"
+          fi
+
+  # checks the falco engine version and enforce bumping when necessary
+  check-engine-version:
+    runs-on: ubuntu-latest
+    needs: [build-dev]
+    steps:    
+      - name: Checkout base ref
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.base_ref }}
+
+      - name: Check Engine version
+        run: |
+          base_hash=$(grep CHECKSUM "./userspace/engine/falco_engine_version.h" | awk '{print $3}' | sed -e 's/"//g')
+          base_engine_ver_major=$(grep ENGINE_VERSION_MAJOR "./userspace/engine/falco_engine_version.h" | head -n 1 | awk '{print $3}' | sed -e 's/(//g' -e 's/)//g')
+          base_engine_ver_minor=$(grep ENGINE_VERSION_MINOR "./userspace/engine/falco_engine_version.h" | head -n 1 | awk '{print $3}' | sed -e 's/(//g' -e 's/)//g')
+          base_engine_ver_patch=$(grep ENGINE_VERSION_PATCH "./userspace/engine/falco_engine_version.h" | head -n 1 | awk '{print $3}' | sed -e 's/(//g' -e 's/)//g')
+          base_engine_ver="${base_engine_ver_major}.${base_engine_ver_minor}.${base_engine_ver_patch}"
+
+          cur_hash=$(echo "${{ needs.build-dev.outputs.cmdout }}" | cut -d ' ' -f 2)
+          cur_engine_ver=$(echo "${{ needs.build-dev.outputs.cmdout }}" | cut -d ' ' -f 1)
+
+          echo "baseref checksum: $base_hash"
+          echo "baseref engine version: $base_engine_ver"
+          echo "headref checksum: $cur_hash"
+          echo "headref engine version: $cur_engine_ver"
+          if [ "$base_hash" != "$cur_hash" ]; then
+              echo "engine checksum for baseref and headref differ"
+              if [ "$base_engine_ver" == "$cur_engine_ver" ]; then
+                  echo "engine version must be bumped"
+                  exit 1
+              else
+                  echo "engine version for baseref and headref differ too, so no bump is required"
+              fi
+          fi

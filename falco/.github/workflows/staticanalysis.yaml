@@ -1,0 +1,35 @@
+name: StaticAnalysis
+on:
+  pull_request:
+permissions:  
+  contents: read
+
+jobs:
+  staticanalysis:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout ⤵️
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install build dependencies ⛓️
+        run: |
+          sudo apt update -y
+          sudo apt install build-essential git cppcheck cmake -y
+
+      - name: Build and run cppcheck 🏎️
+        run: |
+          cmake -B build -S . \
+                -DCMAKE_BUILD_TYPE="release" \
+                -DUSE_BUNDLED_DEPS=On -DUSE_DYNAMIC_LIBELF=Off -DBUILD_WARNINGS_AS_ERRORS=ON -DCREATE_TEST_TARGETS=Off -DBUILD_DRIVER=Off
+          cmake --build build -j4 --target cppcheck
+          cmake --build build -j4 --target cppcheck_htmlreport
+
+      - name: Upload reports ⬆️
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: static-analysis-reports
+          path: ./build/static-analysis-reports
