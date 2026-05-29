@@ -1,0 +1,176 @@
+# Internal Repos
+priv-infra/
+
+# direnv
+.envrc.local
+
+
+# Intelij
+.idea/
+
+# VS Code
+.vs/
+
+# Sonar
+.scannerwork/
+.vs/
+bw-output/
+out/
+sonar/
+
+
+# Object files
+*.o
+*.ko
+*.oo
+*.oo2
+*.pyc
+
+# Libraries
+*.lib
+*.a
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# gcov
+*.gcda
+*.gcno
+
+callgrind.out.*
+cachegrind.out.*
+
+oldcode/tests/connect_speed
+
+*.swp
+
+*.sha1
+
+# SQLITE files
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+#pidfile and errorlog
+*.pid
+*.log
+*.err
+
+#binary
+src/proxysql
+src/*pem
+binaries/*deb
+binaries/*rpm
+tools/eventslog_reader_sample
+tools/eventlog_reader_to_json
+src/proxysql-save.cfg
+src/*log*
+
+proxysql-2.0.0/
+docker/images/proxysql/rhel-compliant/rpmmacros
+
+#core
+core
+
+#config
+proxysql.cnf*
+proxysql.db*
+
+jeprof*heap
+perf.data*
+
+notes.txt
+architecture.txt
+
+
+#builddir
+proxysql-2.*
+
+### DEPS
+deps/cityhash/cityhash-*/
+deps/clickhouse-cpp/clickhouse-cpp-*/
+deps/curl/curl-*/
+deps/jemalloc/jemalloc-*/
+deps/libconfig/libconfig-*/
+deps/libdaemon/libdaemon-*/
+deps/libev/libev-*/
+deps/libhttpserver/libhttpserver-*/
+deps/libinjection/libinjection-*/
+deps/libmicrohttpd/libmicrohttpd-*/
+deps/libmicrohttpd/libmicrohttpd
+deps/libssl/openssl-openssl-*/
+deps/libssl/openssl-*/
+deps/lz4/lz4-*/
+deps/mariadb-client-library/mariadb-connector-c-*/
+deps/pcre/pcre-*/
+deps/prometheus-cpp/prometheus-cpp-*/
+deps/re2/re2-*/
+deps/sqlite3/sqlite-amalgamation-*/
+deps/coredumper/coredumper-*/
+deps/postgresql/postgresql-*/
+deps/postgresql/postgres-*/
+deps/libusual/libusual-*/
+
+test/.vagrant
+.DS_Store
+proxysql-tests.ini
+test/sqlite_history_convert
+
+#heaptrack
+heaptrack.*
+
+#eclipse
+.cproject
+.project
+.settings/
+
+#vscode
+.vscode/
+
+# test deps
+test/deps/mariadb-connector-c/mariadb-connector-c-*/
+test/deps/mysql-connector-c/mysql-5.7.*/
+test/deps/mysql-connector-c/mysql-boost-5.7.*.tar.gz
+test/deps/mysql-connector-c-8.4.0/mariadb-connector-c-*/
+test/deps/mysql-connector-c-8.4.0/mysql-8.4.*/
+test/deps/mysql-connector-c-8.4.0/mysql-8.4.*.tar.gz
+
+#tap tests
+test/tap/tap/cpp-dotenv/cpp-dotenv-*
+test/tap/tap/cpp-dotenv/static/cpp-dotenv-*
+test/tap/tap/cpp-dotenv/dynamic/cpp-dotenv-*
+*-t
+test/tap/tests/galera_1_timeout_count
+test/tap/tests/galera_2_timeout_no_count
+test/tap/tests/setparser_test
+test/tap/tests/setparser_test2
+test/tap/tests/setparser_test3
+test/tap/tests/reg_test_3504-change_user_libmariadb_helper
+test/tap/tests/reg_test_3504-change_user_libmysql_helper
+test/tap/tests/generate_set_session_csv
+test/tap/tests/set_testing-240.csv
+local_testing_datadir/
+test/tap/tests_with_deps/deprecate_eof_support/fwd_eof_ok_query
+test/tap/tests_with_deps/deprecate_eof_support/fwd_eof_query
+
+test/cluster/node??/*
+
+#pkgroot
+pkgroot/
+
+#files generated during CI run
+proxysql-save.cfg
+test/tap/tests/test_cluster_sync_config/cluster_sync_node_stderr.txt
+test/tap/tests/test_cluster_sync_config/proxysql*.pem
+test/tap/tests/test_cluster_sync_config/test_cluster_sync.cnf
+.aider*
+GEMINI.md

@@ -1,0 +1,30 @@
+[Unit]
+Description=High Performance Advanced Proxy for MySQL
+After=network.target
+
+[Service]
+Type=forking
+RuntimeDirectory=proxysql
+#PermissionsStartOnly=true
+#ExecStartPre=/usr/bin/mkdir -p /var/run/proxysql /var/run/proxysql
+#ExecStartPre=/usr/bin/chown -R proxysql: /var/run/proxysql/
+ExecStart=/usr/bin/proxysql --idle-threads -c /etc/proxysql.cnf $PROXYSQL_OPTS
+PIDFile=/var/lib/proxysql/proxysql.pid
+#StandardError=null  # all output is in stderr
+SyslogIdentifier=proxysql
+Restart=no
+User=proxysql
+Group=proxysql
+PermissionsStartOnly=true
+UMask=0007
+LimitNOFILE=102400
+LimitCORE=1073741824
+ProtectHome=yes
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_SETGID CAP_SETUID CAP_SYS_RESOURCE
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_ALG
+ProtectSystem=full
+PrivateDevices=yes
+
+[Install]
+WantedBy=multi-user.target
