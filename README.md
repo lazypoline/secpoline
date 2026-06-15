@@ -1,5 +1,6 @@
 # Secpoline
-**secpoline** is a secure in-process syscall interposer and MPK sandbox that allows for arbitrary interposer functionality without compromising isolation. It uses a _hybrid interposition_ mechanism based on ["System Call Interposition Without Compromise"](https://adriaanjacobs.github.io/files/dsn24secpoline.pdf).
+**secpoline** is a secure in-process syscall interposer and MPK sandbox that allows for arbitrary interposer functionality without compromising isolation. It uses a _hybrid interposition_ mechanism based on ["System Call Interposition Without Compromise"](https://adriaanjacobs.github.io/files/dsn24secpoline.pdf). You can find more details in our USENIX'26 paper, ["Secpoline: A Scalable Approach to Build Secure In-Process Syscall Interposers"](https://adriaanjacobs.github.io/files/sec26secpoline.pdf).
+
 
 ```bibtex
 @inproceedings{sturm2026secpoline,
