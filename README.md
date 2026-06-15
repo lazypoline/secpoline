@@ -8,6 +8,18 @@ Specify the path the the secpoline plugin in the falco config file ./falco/falco
 this has to be an absolute path, the plugin is located in the falco_shim directory.
 
 
+# Secpoline
+**secpoline** is a secure in-process syscall interposer and MPK sandbox that allows for arbitrary interposer functionality without compromising isolation. It uses a _hybrid interposition_ mechanism based on ["System Call Interposition Without Compromise"](https://adriaanjacobs.github.io/files/dsn24secpoline.pdf).
+
+```bibtex
+@inproceedings{sturm2026secpoline,
+  title={Secpoline: A Scalable Approach to Build Secure In-Process Syscall Interposers},
+  author={Sturm, Ruben and  Schelfhout, Anton and G{\"u}lmez, Merve and Jacobs, Adriaan and and Volckaert, Stijn},
+  booktitle={Proceedings of the 35th USENIX Security Symposium (USENIX Security 2026)},
+  year={2026},
+  publisher={USENIX Association}
+}
+```
 
 ## Building
 During first time setup, install some dependencies:
@@ -50,14 +62,6 @@ This assumes that the libc program loader is located at `/lib64/ld-linux-x86-64.
 LOADER_PATH=path/to/ld.so path/to/build/libloader.so path/to/output/secpoline <some binary>
 ```
 
-## Falco evaluation
-First update the path to the secpoline plugin in ./falco/falco.yaml and build secpoline.
-The zip_bench.sh scrip in ./benchmarks/falco_bencmarks can be used to evaluate the overhead of our implemenation.
-```bash
-# from the 'output' folder
-cd ./benchmarks/falco_benchmarks
-./zip_bench.sh
-```
 
 ## Debugging and testing
 We include a `main` binary that contains a number of testcases for secpoline, e.g., multi-threading/multi-processing and signal delivery during trusted/untrusted execution.
@@ -88,7 +92,4 @@ You can modify secpoline to better fit your needs. To add a new syscall handler 
 [src/include/config.h](src/include/config.h) contains some options to control secpoline's behavior. Most are self-explanatory.
 
 ## Compatibility
-secpoline is well-tested on Ubuntu 20.04, 22.04, and 24.04. Its primary compatibility requirement is kernel version >= 5.11 (needs [SUD](https://docs.kernel.org/admin-guide/syscall-user-dispatch.html)) and >= 6.12 for a [necessary bugfix](https://lore.kernel.org/all/20240802061318.2140081-2-aruna.ramakrishna@oracle.com/) in the Linux kernel in secure mode. 
-
-## Related DSN 2024 artifacts
-You can find the benchmarks for the performance evaluation in the DSN paper at [https://github.com/secpoline/benchmarks](https://github.com/secpoline/benchmarks). The Pintool to track application's register preservation expectations across syscalls is located at [https://github.com/secpoline/pintool-syscall-abi-expectations](https://github.com/secpoline/pintool-syscall-abi-expectations). 
+secpoline is well-tested on Ubuntu 20.04, 22.04, and 24.04. Its primary compatibility requirement is kernel version >= 6.12 for a [necessary bugfix](https://lore.kernel.org/all/20240802061318.2140081-2-aruna.ramakrishna@oracle.com/) in the Linux kernel in secure mode. 
