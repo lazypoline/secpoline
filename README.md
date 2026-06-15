@@ -1,15 +1,13 @@
-# secpoline
-
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10372035.svg)](https://doi.org/10.5281/zenodo.10372035)
-
-**lazypoline** is a fast, exhaustive, and expressive syscall interposer for user-space Linux applications. It uses a _hybrid interposition_ mechanism based on [Syscall User Dispatch (SUD)](https://docs.kernel.org/admin-guide/syscall-user-dispatch.html) and [binary rewriting](https://www.usenix.org/conference/atc23/presentation/yasukata) to exhaustively interpose all syscalls with maximal efficiency. You can find more details in our DSN'24 paper, ["System Call Interposition Without Compromise"](https://adriaanjacobs.github.io/files/dsn24secpoline.pdf).
+# Secpoline
+**secpoline** is a secure in-process syscall interposer and MPK sandbox that allows for arbitrary interposer functionality without compromising isolation. It uses a _hybrid interposition_ mechanism based on ["System Call Interposition Without Compromise"](https://adriaanjacobs.github.io/files/dsn24secpoline.pdf).
 
 ```bibtex
-@inproceedings{jacobs2024secpoline,
-  title={System Call Interposition Without Compromise},
-  author={Jacobs, Adriaan and G{\"u}lmez, Merve and Andries, Alicia and Volckaert, Stijn and Voulimeneas, Alexios},
-  booktitle={Proceedings of the International Conference on Dependable Systems and Networks},
-  year={2024}
+@inproceedings{sturm2026secpoline,
+  title={Secpoline: A Scalable Approach to Build Secure In-Process Syscall Interposers},
+  author={Sturm, Ruben and  Schelfhout, Anton and G{\"u}lmez, Merve and Jacobs, Adriaan and and Volckaert, Stijn},
+  booktitle={Proceedings of the 35th USENIX Security Symposium (USENIX Security 2026)},
+  year={2026},
+  publisher={USENIX Association}
 }
 ```
 
@@ -84,7 +82,4 @@ You can modify secpoline to better fit your needs. To add a new syscall handler 
 [src/include/config.h](src/include/config.h) contains some options to control secpoline's behavior. Most are self-explanatory.
 
 ## Compatibility
-secpoline is well-tested on Ubuntu 20.04, 22.04, and 24.04. Its primary compatibility requirement is kernel version >= 5.11 (needs [SUD](https://docs.kernel.org/admin-guide/syscall-user-dispatch.html)) and >= 6.12 for a [necessary bugfix](https://lore.kernel.org/all/20240802061318.2140081-2-aruna.ramakrishna@oracle.com/) in the Linux kernel in secure mode. 
-
-## Related DSN 2024 artifacts
-You can find the benchmarks for the performance evaluation in the DSN paper at [https://github.com/secpoline/benchmarks](https://github.com/secpoline/benchmarks). The Pintool to track application's register preservation expectations across syscalls is located at [https://github.com/secpoline/pintool-syscall-abi-expectations](https://github.com/secpoline/pintool-syscall-abi-expectations). 
+secpoline is well-tested on Ubuntu 20.04, 22.04, and 24.04. Its primary compatibility requirement is kernel version >= 6.12 for a [necessary bugfix](https://lore.kernel.org/all/20240802061318.2140081-2-aruna.ramakrishna@oracle.com/) in the Linux kernel in secure mode. 
