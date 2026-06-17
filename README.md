@@ -9,10 +9,24 @@ Build Secpoline by following the steps in the [next section](#Secpoline:-A-Scala
 >
 > Rerunning `make` can resolve the issue, since the dependency is already built and will not be rebuilt on subsequent runs.
 
-## Testing
+## Running
+
+To start intercepting SQL requests, configure the ProxySQL configuration file, which will be available at [libproxysql/proxysql/etc/proxysql.cnf](libproxysql) once Secpoline has been built. In this file, you can set:
+
+1. The port and address of the `mysql` server  
+2. The port used by the proxy  
+3. The credentials of the database user  
+4. Any filters that should be applied to proxied queries  
+
+Then attach Secpoline to an application that makes SQL requests:
+
+```bash
+PROXYSQL_CONFIG=path/to/libproxysql/proxysql/etc/proxysql.cnf path/to/output/libloader.so path/to/output/secpoline <some binary>
+```
+
 The script for the [sysbench benchmark](https://adriaanjacobs.github.io/files/sec26secpoline.pdf) can be found [here](libproxysql/benchmark/sysbench.sh).
 
-Before running the benchmark:
+To run the benchmark:
 
 1. Install `mysql`.
 2. Run the [initialization script](/libproxysql/benchmark/init_mysql_database.sh) to create the required database and user, or create them manually.  
