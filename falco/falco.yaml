@@ -588,7 +588,7 @@ plugins:
       with_size: false
   - name: secpoline
     # For a summary of config option, see https://github.com/falcosecurity/plugins/tree/main/plugins/container#configuration
-    library_path: /home/ruben/lazypoline/falco_shim/secpoline_plugin/libsecpoline_plugin.so
+    library_path: /PATH/TO/falco_shim/secpoline_plugin/libsecpoline_plugin.so
     init_config:
 
       # We use default config values for "engines" key.
