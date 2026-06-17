@@ -18,8 +18,8 @@ struct msg_buffer{
 };
 
 struct proxysql_virual_connection{
-    int client_fd; //used by the application
-    int server_fd; //used by the monitor
+    volatile int client_fd; //used by the application
+    volatile int server_fd; //used by the monitor
     struct msg_buffer client_to_server_buffer;
     struct msg_buffer server_to_client_buffer;
     struct sockaddr addr;

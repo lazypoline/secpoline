@@ -13,13 +13,13 @@
 //Do not do syscalls here, we are under lock, so the meta monitor can easely enter deadlock
 //We should only do futext for the locks and mmap for requesting new memory
 //TODO just prevent map_fixed unless the entire range belongs to the cid, otherwise wierd race conditions can be forced
-int virt_page_manager::add_page(char* start, size_t size, int prot, int cid, bool map_fixed){
+int virt_page_manager::add_page(char* start, size_t size, int prot, int flags, int cid, bool map_fixed){
 #if TRACK_MAPPINGS
     char selector = get_sud();
-    set_sud_allow();
     assert(pthread_rwlock_wrlock(&lock) == 0);
+    set_sud_allow();
     struct virt_page* p1 = virt_page_alloc();
-    int ret = add_page_locked(start, size, prot, cid, map_fixed, p1);
+    int ret = add_page_locked(start, size, prot, flags, cid, map_fixed, p1);
     if(ret == -1){
         virt_page_free(p1);
     }
@@ -33,7 +33,7 @@ int virt_page_manager::add_page(char* start, size_t size, int prot, int cid, boo
 
 //add a new page group, return -1 if it overlaps with an existing group
 //TODO, when some checks fail after parts have been removed here with map fixed and add remove_page, we should be able to revert or look ahead
-int virt_page_manager::add_page_locked(char* start, size_t size, int prot, int cid, bool map_fixed, struct virt_page* p1){
+int virt_page_manager::add_page_locked(char* start, size_t size, int prot, int flags, int cid, bool map_fixed, struct virt_page* p1){
     size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
     //nolibc_print_size_t_hex("adding page start", (size_t)start);
     //nolibc_print_size_t_hex("adding page end", (size_t)start + size);
@@ -44,6 +44,7 @@ int virt_page_manager::add_page_locked(char* start, size_t size, int prot, int c
     p1->start = start;
     p1->size = size;
     p1->prot = prot;
+    p1->flags = flags;
     p1->Cid = cid;
     p1->next = NULL;
 
@@ -119,8 +120,8 @@ int virt_page_manager::add_page_locked(char* start, size_t size, int prot, int c
 int virt_page_manager::remove_page(char* start, size_t size, int cid){
 #if TRACK_MAPPINGS
     char selector = get_sud();
-    set_sud_allow();
     assert(pthread_rwlock_wrlock(&lock)==0);
+    set_sud_allow();
     int ret = remove_page_locked(start, size, cid);
     assert(pthread_rwlock_unlock(&lock)==0);
     (selector == SYSCALL_DISPATCH_FILTER_ALLOW) ? set_sud_allow() : set_sud_block();
@@ -197,9 +198,10 @@ int virt_page_manager::remove_page_locked(char* start, size_t size, int cid){
         //it is possible that this is still the same page group as the start page
         //end lies somewhere on next_page
         if(next_page_end >= end){
-            if((end <= start_page->start) || (end > start_page->start + start_page->size)){
-                nolibc_print_size_t_hex("last page but no overlap start", (size_t)start_page->start);
-                nolibc_print_size_t_hex("last page but no overlap end", (size_t)start_page->start + start_page->size);
+            if((end <= next_page->start)){
+                nolibc_print_size_t_hex("last page but no overlap start", (size_t)next_page->start);
+                nolibc_print_size_t_hex("last page but no overlap end", (size_t)next_page_end);
+                asm("ud2");
                 return -1;
             }
             end_page = next_page;
@@ -224,7 +226,6 @@ int virt_page_manager::remove_page_locked(char* start, size_t size, int cid){
             
     //the entire range is valid
     //second step remove all pages from start to end (possibly start and end aswel)
-    
     //common case: remove exactly one page group
     if(start_page == end_page){
         char* page_end = start_page->start+start_page->size;
@@ -262,6 +263,7 @@ int virt_page_manager::remove_page_locked(char* start, size_t size, int cid){
         struct virt_page* new_group = virt_page_alloc();
         new_group->Cid = start_page->Cid;
         new_group->prot = start_page->prot;
+        new_group->flags = start_page->flags;
         new_group->start = end;
         new_group->size = page_end-end;
         new_group->next = start_page->next;
@@ -269,12 +271,16 @@ int virt_page_manager::remove_page_locked(char* start, size_t size, int cid){
         return 0;
     }
 
+    nolibc_assert(prev_page->next == start_page);
+
     //there are multiple groups in the range, first check if start needs to be fully removed or only reduced
     if(start == start_page->start){
         struct virt_page* temp = start_page;
         start_page = prev_page;
         if(prev_page == NULL){
             pages = temp->next;
+        }else{
+            start_page->next = temp->next;
         }
         virt_page_free(temp);
     }else{
@@ -400,6 +406,7 @@ int virt_page_manager::remove_page_map_fixed_locked(char* start, size_t size, in
         struct virt_page* new_group = virt_page_alloc();
         new_group->Cid = current_page->Cid;
         new_group->prot = current_page->prot;
+        new_group->flags = current_page->flags;
         new_group->start = end;
         new_group->size = current_end-end;
         new_group->next = current_page->next;
@@ -416,8 +423,8 @@ int virt_page_manager::remove_page_map_fixed_locked(char* start, size_t size, in
 int virt_page_manager::update_mprotect(char* start, size_t size, int prot, int cid){
 #if TRACK_MAPPINGS
     char selector = get_sud();
-    set_sud_allow();
     assert(pthread_rwlock_wrlock(&lock)==0);
+    set_sud_allow();
     int ret = update_mprotect_locked(start, size, prot, cid);
     assert(pthread_rwlock_unlock(&lock)==0);
     (selector == SYSCALL_DISPATCH_FILTER_ALLOW) ? set_sud_allow() : set_sud_block();
@@ -460,6 +467,7 @@ int virt_page_manager::update_mprotect_locked(char* start, size_t size, int prot
         //split the group in two, update the originals protections
         struct virt_page* new_group = virt_page_alloc();
         new_group->prot = start_page->prot;
+        new_group->flags = start_page->flags;
         new_group->Cid = cid;
         new_group->start = end;
         new_group->size = start_page_end - end;
@@ -475,6 +483,7 @@ int virt_page_manager::update_mprotect_locked(char* start, size_t size, int prot
         //split the group in two, set the protections of the new group
         struct virt_page* new_group = virt_page_alloc();
         new_group->prot = prot;
+        new_group->flags = start_page->flags;
         new_group->Cid = cid;
         new_group->start = start;
         new_group->size = size;
@@ -494,12 +503,14 @@ int virt_page_manager::update_mprotect_locked(char* start, size_t size, int prot
 
         group1->Cid = cid;
         group1->prot = prot;
+        group1->flags = start_page->flags;
         group1->size = size;
         group1->start = start;
         group1->next = group2;
 
         group2->Cid = cid;
         group2->prot = start_page->prot;
+        group2->flags = start_page->flags;
         group2->size = start_page_end - end;
         group2->start = end;
         group2->next = start_page->next;
@@ -520,6 +531,7 @@ int virt_page_manager::update_mprotect_locked(char* start, size_t size, int prot
             if(current_page->next == NULL){
                 struct virt_page* new_group = virt_page_alloc();
                 new_group->prot = prot;
+                new_group->flags = current_page->flags;
                 new_group->Cid = cid;
                 new_group->start = start;
                 new_group->size = size;
@@ -532,6 +544,7 @@ int virt_page_manager::update_mprotect_locked(char* start, size_t size, int prot
             
             struct virt_page* new_group = virt_page_alloc();
             new_group->prot = prot;
+            new_group->flags = current_page->flags;
             new_group->Cid = cid;
             new_group->start = start;
             new_group->size = size;
@@ -600,6 +613,7 @@ int virt_page_manager::update_size_locked(char* start, size_t old_size, size_t n
         struct virt_page* new_group = virt_page_alloc();
         new_group->Cid = cid;
         new_group->prot = current_group->prot;
+        new_group->flags = current_group->flags;
         new_group->next = current_group->next;
         new_group->start = old_end;
         new_group->size = (current_group->start + current_group->size) - old_end;
@@ -610,7 +624,6 @@ int virt_page_manager::update_size_locked(char* start, size_t old_size, size_t n
     }
     return -1;
 }
-
 
 struct virt_page* virt_page_manager::lookup_addr(char* addr, int cid){
 #if TRACK_MAPPINGS
@@ -805,7 +818,7 @@ void virt_page_manager::refill_free_list(){
     nolibc_assert(PAGE_SIZE % sizeof(struct virt_page) == 0);
 
     //nolibc_print_str("free list empty\n");
-
+    nolibc_assert(gsreldata->readable_data.sud_selector==SYSCALL_DISPATCH_FILTER_ALLOW);
     //NEW MMAP
     struct virt_page* new_pages = (struct virt_page*)inline_syscall6(__NR_mmap, 0, PAGE_SIZE*2, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     nolibc_assert(inline_syscall6(__NR_pkey_mprotect, new_pages, PAGE_SIZE*2, PROT_READ|PROT_WRITE, SECPOLINE_MPKEY, 0, 0)==0);
@@ -824,7 +837,7 @@ void virt_page_manager::refill_free_list(){
 
     //this will not require a second page as it does not use map_fixed
     struct virt_page* p1 = &new_pages[(PAGE_SIZE*2/sizeof(struct virt_page))-1];
-    nolibc_assert(add_page_locked((char*)new_pages, PAGE_SIZE*2, PROT_READ|PROT_WRITE, TS_MONITOR, false, p1)==0);
+    nolibc_assert(add_page_locked((char*)new_pages, PAGE_SIZE*2, PROT_READ|PROT_WRITE, TS_MONITOR, MAP_PRIVATE|MAP_SHARED, false, p1)==0);
 
     return;
 }
@@ -842,6 +855,7 @@ struct virt_page* virt_page_manager::virt_page_alloc(){
     nolibc_assert(free_pages != NULL);
     struct virt_page* temp = free_pages;
     free_pages = free_pages->next;
+    temp->next == NULL;
     return temp;
 }
 

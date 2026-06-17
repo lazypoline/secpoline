@@ -30,6 +30,9 @@ unsafe_page_list unsafe_pages;
 extern virt_page_manager page_manager;
 
 struct unsafe_page* add_unsafe_page(void* address, int current_perm, int desired_perm, bool trusted_page, std::vector<char*>* unsafe_instructions){
+#if !SCAN_UNSAFE_INSTRUCTIONS
+  return NULL;
+#endif
   struct unsafe_page* updated_page = update_unsafe_page(address, current_perm, desired_perm, trusted_page, unsafe_instructions);
   if(updated_page != NULL) return updated_page;
   struct unsafe_page* new_page = (unsafe_page*)calloc(1, sizeof(unsafe_page));
@@ -52,6 +55,10 @@ struct unsafe_page* add_unsafe_page(void* address, int current_perm, int desired
 
 //returns the index in the vector if the unsafe_page existed and -1 otherwise
 struct unsafe_page* update_unsafe_page(void* address, int current_perm, int desired_perm, bool trusted_page, std::vector<char*>* unsafe_instructions){
+#if !SCAN_UNSAFE_INSTRUCTIONS
+  return NULL;
+#endif
+  //nolibc_print_size_t_hex("unsafe_pages", (size_t)&unsafe_pages);
   if(unsafe_pages.size==0) return NULL;
   size_t i = 0;
   while(unsafe_pages.list[i]->address != address){

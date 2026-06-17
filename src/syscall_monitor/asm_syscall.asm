@@ -11,6 +11,7 @@ movq 0x8(%rsp), %r11 /*rax*/
 pushq %r12
 movq %rdx, %r12
 
+#if EXCLUSIVE_MPK_POLICY
     /*inscrease privileges*/
     xorl %ecx, %ecx
     xorl %edx, %edx
@@ -21,12 +22,14 @@ movq %rdx, %r12
     ud2
     int3
 1:
+#endif
 
 movq %r11, %rax
 movq %r12, %rdx
 syscall
 movq %rax, %r11
 
+#if EXCLUSIVE_MPK_POLICY
     /*inscrease privileges*/
     xorl %ecx, %ecx
     xorl %edx, %edx
@@ -38,6 +41,7 @@ movq %rax, %r11
     ud2
     int3
 1:
+#endif
 
 movq %gs:COMPARTMENT_ID_OFFSET, %r12
 cmpq $TS_MONITOR, %r12
@@ -96,3 +100,5 @@ meta_syscall_hook:
 .abort:
     ud2
     int3
+
+.section .note.GNU-stack,"",@progbits

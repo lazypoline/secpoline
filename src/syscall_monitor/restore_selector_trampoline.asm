@@ -120,3 +120,5 @@ restore_selector_trampoline:
 .unsafe_state:
     ud2
     int3
+
+.section .note.GNU-stack,"",@progbits

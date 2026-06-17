@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include "segfault_handler.h"
 #include "virt_page_manager.h"
+#include <ctype.h>
 
 #ifndef TRAP_PERF
     #define TRAP_PERF 6
@@ -449,6 +450,7 @@ static void remove_element_active_thread_list(int tid){
     nolibc_assert(i==thread_synchronizer.active_thread_list_size);
 }
 
+
 //can be used to add or remove a thread
 //also initialises/frees the hbreakpoint controller
 extern "C" void update_active_thread_list(bool remove_thread){
@@ -474,7 +476,7 @@ extern "C" void update_active_thread_list(bool remove_thread){
         remove_element_active_thread_list(nolibc_gettid());
         nolibc_assert(old_size == thread_synchronizer.active_thread_list_size+1);
         gsreldata->hardware_breakpoints->remove_all_hbreakpoints();
-        free(gsreldata->hardware_breakpoints);
+        nolibc_assert(inline_syscall6(__NR_mmap, gsreldata->hardware_breakpoints, __builtin_align_up(sizeof(hbreakpoint_controller), PAGE_SIZE), 0, 0, 0, 0));
         hbreakpoint_sync_mutex.unlock();
 
         //nolibc_print_size_t("removed thread from active thread list", nolibc_gettid());
@@ -503,8 +505,9 @@ extern "C" void update_active_thread_list(bool remove_thread){
     //nolibc_print_str("released lock update list");
 
     set_sud_block();
+    size_t hardware_breakpoint_location = inline_syscall6(__NR_mmap, 0, __builtin_align_up(sizeof(hbreakpoint_controller), PAGE_SIZE), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     //TODO, this is a race condition. the local copy can changes after copying to the heap.
-    gsreldata->hardware_breakpoints = new hbreakpoint_controller(hardware_breakpoints);
+    gsreldata->hardware_breakpoints = new ((hbreakpoint_controller*)hardware_breakpoint_location) hbreakpoint_controller(hardware_breakpoints);
     return;
 }
 

@@ -9,25 +9,27 @@
 
 !src/
 !src/**
+src/secpoline_loader/Makefile
+src/secpoline_loader/CMakeFiles/
+src/secpoline_loader/CMakeFiles/**
 
 !debug_scripts/
 !debug_scripts/*.py
 
-!secpoline_loader/
-!secpoline_loader/**
-
-secpoline_loader/CMakeFiles/
-secpoline_loader/CMakeFiles/**
-
 !tests/
 !tests/**
 
-!proxysql/
-!proxysql/**
+!libproxysql/
+!libproxysql/libproxysql1.patch
+!libproxysql/Makefile
+!libproxysql/benchmark/
+!libproxysql/benchmark/init_mysql_database.sh
+!libproxysql/benchmark/sysbench.sh
 
 !benchmarks/
 !benchmarks/microbench/
 !benchmarks/microbench/*
 !benchmarks/config.json
+!benchmarks/linux-6.12.0-full-cerberus.patch
 !benchmarks/benchmark_cerberus.md
 !benchmarks/benchmark_endokernel.md

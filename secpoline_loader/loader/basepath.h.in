@@ -1,3 +1,0 @@
-#pragma once
-
-#define BASE_LIBRARY_PATH "@BASE_LIBRARY_PATH@"

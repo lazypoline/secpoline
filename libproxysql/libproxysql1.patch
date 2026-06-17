@@ -1,0 +1,392 @@
+diff --git a/deps/Makefile b/deps/Makefile
+index ea339bacd..d23b93eb3 100644
+--- a/deps/Makefile
++++ b/deps/Makefile
+@@ -99,7 +99,7 @@ libev/libev/.libs/libev.a:
+ 	cd libev && rm -rf libev-*/ || true
+ 	cd libev && tar -zxf libev-*.tar.gz
+ 	cd libev/libev && patch ev.c < ../ev.c-multiplication-overflow.patch
+-	cd libev/libev && ./configure
++	cd libev/libev && CFLAGS='-fPIC' CXXFLAGS='-fPIC' ./configure
+ 	cd libev/libev && CC=${CC} CXX=${CXX} ${MAKE}
+ 
+ ev: libev/libev/.libs/libev.a
+@@ -108,7 +108,7 @@ ev: libev/libev/.libs/libev.a
+ coredumper/coredumper/src/libcoredumper.a:
+ 	cd coredumper && rm -rf coredumper-*/ || true
+ 	cd coredumper && tar -zxf coredumper-*.tar.gz
+-	cd coredumper/coredumper && cmake . -DBUILD_TESTING=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Debug
++	cd coredumper/coredumper && cmake . -DBUILD_TESTING=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Debug -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+ 	cd coredumper/coredumper && CC=${CC} CXX=${CXX} ${MAKE}
+ 
+ coredumper: coredumper/coredumper/src/libcoredumper.a
+@@ -130,7 +130,7 @@ curl: curl/curl/lib/.libs/libcurl.a
+ libmicrohttpd/libmicrohttpd/src/microhttpd/.libs/libmicrohttpd.a:
+ 	cd libmicrohttpd && rm -rf libmicrohttpd-*/ || true
+ 	cd libmicrohttpd && tar -zxf libmicrohttpd-*.tar.gz
+-	cd libmicrohttpd/libmicrohttpd && ./configure --enable-https && CC=${CC} CXX=${CXX} ${MAKE}
++	cd libmicrohttpd/libmicrohttpd && CFLAGS='-fPIC' CXXFLAGS='-fPIC' ./configure --enable-https && CC=${CC} CXX=${CXX} ${MAKE}
+ 
+ microhttpd: libmicrohttpd/libmicrohttpd/src/microhttpd/.libs/libmicrohttpd.a
+ 
+@@ -155,7 +155,7 @@ lz4: lz4/lz4/lib/liblz4.a
+ clickhouse-cpp/clickhouse-cpp/clickhouse/libclickhouse-cpp-lib.a:
+ 	cd clickhouse-cpp && rm -rf clickhouse-cpp-*/ || true
+ 	cd clickhouse-cpp && tar -zxf clickhouse-cpp-*.tar.gz
+-	cd clickhouse-cpp/clickhouse-cpp && cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo .
++	cd clickhouse-cpp/clickhouse-cpp && cmake -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_C_FLAGS="-fPIC" -DCMAKE_CXX_FLAGS="-fPIC" -DCMAKE_BUILD_TYPE=RelWithDebInfo .
+ 	cd clickhouse-cpp/clickhouse-cpp && CC=${CC} CXX=${CXX} ${MAKE}
+ 
+ clickhouse-cpp: clickhouse-cpp/clickhouse-cpp/clickhouse/libclickhouse-cpp-lib.a
+@@ -165,7 +165,7 @@ libdaemon/libdaemon/libdaemon/.libs/libdaemon.a:
+ 	cd libdaemon && rm -rf libdaemon-*/ || true
+ 	cd libdaemon && tar -zxf libdaemon-0.14.tar.gz
+ 	cd libdaemon/libdaemon && patch -p0 < ../daemon_fork_umask.patch
+-	cd libdaemon/libdaemon && cp ../config.guess . && chmod +x config.guess && cp ../config.sub . && chmod +x config.sub && ./configure --disable-examples
++	cd libdaemon/libdaemon && cp ../config.guess . && chmod +x config.guess && cp ../config.sub . && chmod +x config.sub && CFLAGS="-fPIC" CXXFLAGS="-fPIC" ./configure --disable-examples
+ 	cd libdaemon/libdaemon && CC=${CC} CXX=${CXX} ${MAKE}
+ 
+ libdaemon: libdaemon/libdaemon/libdaemon/.libs/libdaemon.a
+@@ -177,7 +177,7 @@ jemalloc/jemalloc/lib/libjemalloc.a:
+ 	cd jemalloc/jemalloc && patch src/jemalloc.c < ../issue823.520.patch
+ 	cd jemalloc/jemalloc && patch src/jemalloc.c < ../issue2358.patch
+ 	cd jemalloc/jemalloc && patch -p0 < ../nothrow.patch
+-	cd jemalloc/jemalloc && ./configure ${MYJEOPT}
++	cd jemalloc/jemalloc && CFLAGS='-fPIC' CXXFLAGS='-fPIC' ./configure ${MYJEOPT}
+ #	cd jemalloc/jemalloc && sed -i -e 's/-O3 /-O3 -fPIC /' Makefile
+ 	cd jemalloc/jemalloc && CC=${CC} CXX=${CXX} ${MAKE}
+ 
+@@ -252,7 +252,7 @@ sqlite3: sqlite3/sqlite3/sqlite3.o
+ libconfig/libconfig/out/libconfig++.a:
+ 	cd libconfig && rm -rf libconfig-*/ || true
+ 	cd libconfig && tar -zxf libconfig-*.tar.gz
+-	cd libconfig/libconfig && cmake -DBUILD_SHARED_LIBS=0 -DBUILD_EXAMPLES=0 -DBUILD_TESTS=0 -DBUILD_FUZZERS=0 .
++	cd libconfig/libconfig && cmake -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=0 -DBUILD_EXAMPLES=0 -DBUILD_TESTS=0 -DBUILD_FUZZERS=0 .
+ 	cd libconfig/libconfig && CC=${CC} CXX=${CXX} ${MAKE}
+ 
+ libconfig: libconfig/libconfig/out/libconfig++.a
+@@ -265,7 +265,7 @@ prometheus-cpp/prometheus-cpp/lib/libprometheus-cpp-core.a:
+ 	cd prometheus-cpp/prometheus-cpp && patch -p1 < ../serial_exposer.patch
+ 	cd prometheus-cpp/prometheus-cpp && patch -p1 < ../registry_counters_reset.patch
+ 	cd prometheus-cpp/prometheus-cpp && patch -p1 < ../fix_old_distros.patch
+-	cd prometheus-cpp/prometheus-cpp && cmake . -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTING=OFF -DENABLE_PUSH=OFF
++	cd prometheus-cpp/prometheus-cpp && cmake . -DBUILD_SHARED_LIBS=OFF -DENABLE_TESTING=OFF -DENABLE_PUSH=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+ 	cd prometheus-cpp/prometheus-cpp && CC=${CC} CXX=${CXX} ${MAKE}
+ 
+ prometheus-cpp: prometheus-cpp/prometheus-cpp/lib/libprometheus-cpp-core.a
+@@ -293,7 +293,7 @@ pcre/pcre/.libs/libpcre.a:
+ 	cd pcre && rm -rf pcre-*/ || true
+ 	cd pcre && tar -zxf pcre-*.tar.gz
+ 	cd pcre/pcre && patch pcretest.c < ../pcretest.c-multiplication-overflow.patch
+-	cd pcre/pcre && ./configure
++	cd pcre/pcre && CFLAGS='-fPIC' CXXFLAGS='-fPIC' ./configure
+ 	cd pcre/pcre && CC=${CC} CXX=${CXX} ${MAKE}
+ 
+ pcre: pcre/pcre/.libs/libpcre.a
+@@ -307,8 +307,8 @@ postgresql/postgresql/src/interfaces/libpq/libpq.a:
+ 	cd postgresql/postgresql && patch -p0 < ../fmt_err_msg.patch
+ 	cd postgresql/postgresql && patch -p0 < ../bind_fmt_text.patch
+ 	cd postgresql/postgresql && patch -p0 < ../pqsendpipelinesync.patch
+-	#cd postgresql/postgresql && LD_LIBRARY_PATH="$(shell pwd)/libssl/openssl" ./configure --with-ssl=openssl --with-includes="$(shell pwd)/libssl/openssl/include/" --with-libraries="$(shell pwd)/libssl/openssl/" --without-readline --enable-debug  CFLAGS="-ggdb -O0 -fno-omit-frame-pointer" CPPFLAGS="-g -O0"
+-	cd postgresql/postgresql && LD_LIBRARY_PATH="$(SSL_LDIR)" ./configure --with-ssl=openssl --with-includes="$(SSL_IDIR)" --with-libraries="$(SSL_LDIR)" --without-readline
++	#cd postgresql/postgresql && LD_LIBRARY_PATH="$(shell pwd)/libssl/openssl" ./configure --with-ssl=openssl --with-includes="$(shell pwd)/libssl/openssl/include/" --with-libraries="$(shell pwd)/libssl/openssl/" --without-readline --enable-debug  CFLAGS="-ggdb -O0 -fno-omit-frame-pointer -fPIC" CPPFLAGS="-g -O0 -fPIC" 
++	cd postgresql/postgresql && LD_LIBRARY_PATH="$(SSL_LDIR)" ./configure --with-ssl=openssl --with-includes="$(SSL_IDIR)" --with-libraries="$(SSL_LDIR)" --without-readline CFLAGS="-fPIC" CPPFLAGS="-fPIC"
+ 	cd postgresql/postgresql/src/interfaces/libpq && CC=${CC} CXX=${CXX} ${MAKE} MAKELEVEL=0
+ 	#cd postgresql/postgresql && CC=${CC} CXX=${CXX} ${MAKE} -f src/interfaces/libpq/Makefile all
+ 
+@@ -319,7 +319,7 @@ libusual/libusual/.libs/libusual.a:
+ 	cd libusual && rm -rf libusual-*/ || true
+ 	cd libusual && tar -zxf libusual-*.tar.gz
+ 	cd libusual/libusual && ./autogen.sh
+-	cd libusual/libusual &&  CPPFLAGS="-I$(SSL_IDIR)" LDFLAGS="$(LIB_SSL_PATH) $(LIB_CRYPTO_PATH)" ./configure --with-openssl="$(SSL_LDIR)" --disable-shared
++	cd libusual/libusual &&  CPPFLAGS="-I$(SSL_IDIR)" LDFLAGS="$(LIB_SSL_PATH) $(LIB_CRYPTO_PATH)" CFLAGS='-fPIC' CXXFLAGS='-fPIC'  ./configure --with-openssl="$(SSL_LDIR)" --disable-shared
+ 	cd libusual/libusual && CC=${CC} CXX=${CXX} ${MAKE}
+ 
+ libusual: libusual/libusual/.libs/libusual.a
+diff --git a/deps/libscram/Makefile b/deps/libscram/Makefile
+index 4be0b9d37..d73efb8c1 100644
+--- a/deps/libscram/Makefile
++++ b/deps/libscram/Makefile
+@@ -1,5 +1,5 @@
+ CC ?= gcc
+-CFLAGS_common = -Wall -Iinclude
++CFLAGS_common = -Wall -Iinclude -fPIC
+ CFLAGS_DEBUG = -g -O0
+ CFLAGS_RELEASE = -O3
+ SRC_DIR = src
+diff --git a/lib/ProxySQL_GloVars.cpp b/lib/ProxySQL_GloVars.cpp
+index f0da1a812..bcdba2651 100644
+--- a/lib/ProxySQL_GloVars.cpp
++++ b/lib/ProxySQL_GloVars.cpp
+@@ -319,7 +319,6 @@ ProxySQL_GlobalVariables::ProxySQL_GlobalVariables() :
+ void ProxySQL_GlobalVariables::install_signal_handler() {
+ 	signal(SIGUSR1, log_handler);
+ 	signal(SIGTERM, term_handler);
+-	signal(SIGSEGV, crash_handler);
+ 	signal(SIGABRT, crash_handler);
+ 	signal(SIGFPE, crash_handler);
+ 	signal(SIGPIPE, SIG_IGN);
+diff --git a/src/Makefile b/src/Makefile
+index d4b3fe837..56094cfc7 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -72,7 +72,7 @@ endif
+ 
+ 
+ 
+-MYCXXFLAGS := $(STDCPP)
++MYCXXFLAGS := $(STDCPP) -fPIC
+ ifeq ($(CXX),clang++)
+ 	MYCXXFLAGS += -fuse-ld=lld
+ endif
+@@ -149,24 +149,25 @@ LIBPROXYSQLAR += $(CITYHASH_LDIR)/libcityhash.a
+ 
+ ODIR := obj
+ 
+-EXECUTABLE := proxysql
++LIBNAME := proxysql.so
+ 
+-_OBJ := main.o proxysql_global.o SQLite3_Server.o proxy_tls.o
++_OBJ := main.o proxysql_global.o SQLite3_Server.o proxy_tls.o
+ OBJ := $(patsubst %,$(ODIR)/%,$(_OBJ))
+ 
+ $(ODIR)/%.o: %.cpp
+ 	$(CXX) -c -o $@ $< $(MYCXXFLAGS) $(CXXFLAGS) -Wall
+ 
+-$(EXECUTABLE): $(ODIR) $(OBJ) $(LIBPROXYSQLAR)
++$(LIBNAME): $(ODIR) $(OBJ) $(LIBPROXYSQLAR)
+ ifeq ($(PROXYSQLCLICKHOUSE),1)
+-	$(CXX) -o $@ $(OBJ) $(CLANGFIX) $(LIBPROXYSQLAR) $(CLICKHOUSE_CPP_LDIR)/libclickhouse-cpp-lib.a $(CLICKHOUSE_CPP_PATH)/contrib/zstd/zstd/libzstdstatic.a $(LZ4_LDIR)/liblz4.a $(MYCXXFLAGS) $(CXXFLAGS) $(LDIRS) $(LIBS) $(MYLIBS)
++	$(CXX) -shared -o $@ $(OBJ) $(CLANGFIX) $(LIBPROXYSQLAR) $(CLICKHOUSE_CPP_LDIR)/libclickhouse-cpp-lib.a $(CLICKHOUSE_CPP_PATH)/contrib/zstd/zstd/libzstdstatic.a $(LZ4_LDIR)/liblz4.a $(MYCXXFLAGS) $(CXXFLAGS) $(LDIRS) $(LIBS) $(MYLIBS)
+ else
+-	$(CXX) -o $@ $(OBJ) $(CLANGFIX) $(LIBPROXYSQLAR) $(MYCXXFLAGS) $(CXXFLAGS) $(LDIRS) $(LIBS) $(MYLIBS)
++	$(CXX) -shared -o $@ $(OBJ) $(CLANGFIX) $(LIBPROXYSQLAR) $(MYCXXFLAGS) $(CXXFLAGS) $(LDIRS) $(LIBS) $(MYLIBS)
+ endif
++
+ ifeq ($(UNAME_S),Darwin)
+-	shasum $(EXECUTABLE) > $(EXECUTABLE).sha1
++	shasum $(LIBNAME) > $(LIBNAME).sha1
+ else
+-	sha1sum $(EXECUTABLE) > $(EXECUTABLE).sha1
++	sha1sum $(LIBNAME) > $(LIBNAME).sha1
+ endif
+ 
+ $(ODIR):
+@@ -181,5 +182,5 @@ $(LIBPROXYSQLAR):
+ default: $(EXECUTABLE)
+ 
+ clean:
+-	rm -rf *.pid $(ODIR)/*.o $(ODIR)/*.gcno $(ODIR)/*.gcda *~ core perf.data* heaptrack.proxysql.* $(EXECUTABLE) $(EXECUTABLE).sha1 $(ODIR)
++	rm -rf *.pid $(ODIR)/*.o $(ODIR)/*.gcno $(ODIR)/*.gcda *~ core perf.data* heaptrack.proxysql.* $(LIBNAME) $(LIBNAME).sha1 $(ODIR)
+ 
+diff --git a/src/main.cpp b/src/main.cpp
+index aa78d0f79..9c5ed6d10 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -71,6 +71,7 @@ using std::map;
+ using std::string;
+ using std::vector;
+ 
++int main_destructor();
+ 
+ void sleep_iter(unsigned int iter) {
+ 	usleep(50*iter);
+@@ -2540,7 +2541,15 @@ void watchdog_main_loop() {
+ 	}
+ }
+ 
+-int main(int argc, const char * argv[]) {
++
++int main_constructor() {
++	int argc = 4;
++	const char * argv[4];
++
++	argv[0] = "proxysql.so";
++	argv[1] = "-c";
++	argv[2] = getenv("PROXYSQL_CONFIG");
++	argv[3] = "-f";
+ 
+ 	if (check_openssl_version() == false) {
+ 		exit(EXIT_FAILURE);
+@@ -2899,6 +2908,7 @@ int main(int argc, const char * argv[]) {
+ 	{
+ 		cpu_timer t;
+ 		ProxySQL_Main_init_SSL_module();
++
+ #ifdef DEBUG
+ 		std::cerr << "Main SSL init variables completed in ";
+ #endif
+@@ -2946,7 +2956,7 @@ int main(int argc, const char * argv[]) {
+ 		std::cerr << "SHA1 generated in ";
+ #endif
+ 	}
+-	if (GloVars.global.foreground==false) {
++	if (GloVars.global.foreground==false && 0) {
+ 		{
+ 			cpu_timer t;
+ 			ProxySQL_daemonize_phase1((char *)argv[0]);
+@@ -2970,7 +2980,7 @@ int main(int argc, const char * argv[]) {
+ 			GloVars.global.start_time=monotonic_time();
+ 			GloVars.install_signal_handler();
+ 			if (ProxySQL_daemonize_phase2()==false) {
+-				goto finish;
++				main_destructor();
+ 			}
+ 
+ #ifdef DEBUG
+@@ -2996,7 +3006,7 @@ __start_label:
+ #endif
+ 	}
+ 	if (glovars.shutdown) {
+-		goto __shutdown;
++		main_destructor();
+ 	}
+ 
+ 	{
+@@ -3014,9 +3024,12 @@ __start_label:
+ 	proxy_info("For support visit: https://proxysql.com/services/support/\n");
+ 	proxy_info("For consultancy visit: https://proxysql.com/services/consulting/\n");
+ 
+-	watchdog_main_loop();
++	//watchdog_main_loop();
++	proxy_info("\n\n\n\n\n\n\n\nEnding it all:(\n\n\n\n\n\n\n\n");
++	return 1;
++}
+ 
+-__shutdown:
++int main_destructor(){
+ 
+ 	proxy_info("Starting shutdown...\n");
+ 
+@@ -3033,7 +3046,7 @@ __shutdown:
+ 		}
+ 		glovars.reload=0;
+ 		glovars.shutdown=0;
+-		goto __start_label;
++		assert(0);
+ 	}
+ 
+ finish:
+@@ -3055,5 +3068,6 @@ finish:
+ 		}
+ 	}
+ #endif
++	exit(1);
+ 	return 0;
+-}
++}
+diff --git a/etc/proxysql.cnf b/etc/proxysql.cnf
+index 19669df53..efe7c089a 100644
+--- a/etc/proxysql.cnf
++++ b/etc/proxysql.cnf
+@@ -31,8 +31,8 @@
+ #
+ ########################################################################################
+ 
+-datadir="/var/lib/proxysql"
+-errorlog="/var/lib/proxysql/proxysql.log"
++datadir="./"
++errorlog="./proxysql.log"
+ 
+ admin_variables=
+ {
+@@ -51,16 +51,17 @@ mysql_variables=
+ 	default_query_timeout=36000000
+ 	have_compress=true
+ 	poll_timeout=2000
+-#	interfaces="0.0.0.0:6033;/tmp/proxysql.sock"
+-	interfaces="0.0.0.0:6033"
++#	interfaces="127.0.0.1:6033;/tmp/proxysql.sock"
++	interfaces="127.0.0.1:6033"
+ 	default_schema="information_schema"
+ 	stacksize=1048576
+ 	server_version="5.5.30"
+ 	connect_timeout_server=3000
+ # make sure to configure monitor username and password
+ # https://github.com/sysown/proxysql/wiki/Global-variables#mysql-monitor_username-mysql-monitor_password
+-	monitor_username="monitor"
+-	monitor_password="monitor"
++	mysql-monitor_enabled=false
++	monitor_username="admin"
++	monitor_password="admin"
+ 	monitor_history=600000
+ 	monitor_connect_interval=60000
+ 	monitor_ping_interval=10000
+@@ -71,60 +72,34 @@ mysql_variables=
+ 	commands_stats=true
+ 	sessions_sort=true
+ 	connect_retries_on_failure=10
++	max_allowed_packet = 100
+ }
+ 
+ 
+ # defines all the MySQL servers
+ mysql_servers =
+ (
+-#	{
+-#		address = "127.0.0.1" # no default, required . If port is 0 , address is interpred as a Unix Socket Domain
+-#		port = 3306           # no default, required . If port is 0 , address is interpred as a Unix Socket Domain
+-#		hostgroup = 0	        # no default, required
+-#		status = "ONLINE"     # default: ONLINE
+-#		weight = 1            # default: 1
+-#		compression = 0       # default: 0
+-#   max_replication_lag = 10  # default 0 . If greater than 0 and replication lag passes such threshold, the server is shunned
+-#	},
+-#	{
+-#		address = "/var/lib/mysql/mysql.sock"
+-#		port = 0
+-#		hostgroup = 0
+-#	},
+-#	{
+-#		address="127.0.0.1"
+-#		port=21891
+-#		hostgroup=0
+-#		max_connections=200
+-#	},
+-#	{ address="127.0.0.2" , port=3306 , hostgroup=0, max_connections=5 },
+-#	{ address="127.0.0.1" , port=21892 , hostgroup=1 },
+-#	{ address="127.0.0.1" , port=21893 , hostgroup=1 }
+-#	{ address="127.0.0.2" , port=3306 , hostgroup=1 },
+-#	{ address="127.0.0.3" , port=3306 , hostgroup=1 },
+-#	{ address="127.0.0.4" , port=3306 , hostgroup=1 },
+-#	{ address="/var/lib/mysql/mysql.sock" , port=0 , hostgroup=1 }
++	{
++	address = "127.0.0.1" # no default, required . If port is 0 , address is interpred as a Unix Socket Domain
++		port = 3306           # no default, required . If port is 0 , address is interpred as a Unix Socket Domain
++		hostgroup = 0	        # no default, required
++		status = "ONLINE"     # default: ONLINE
++		weight = 1            # default: 1
++		compression = 0       # default: 0
++   max_replication_lag = 10  # default 0 . If greater than 0 and replication lag passes such threshold, the server is shunned
++	}
+ )
+ 
+ 
+ # defines all the MySQL users
+-mysql_users:
++mysql_users =
+ (
+-#	{
+-#		username = "username" # no default , required
+-#		password = "password" # default: ''
+-#		default_hostgroup = 0 # default: 0
+-#		active = 1            # default: 1
+-#	},
+-#	{
+-#		username = "root"
+-#		password = ""
+-#		default_hostgroup = 0
+-#		max_connections=1000
+-#		default_schema="test"
+-#		active = 1
+-#	},
+-#	{ username = "user1" , password = "password" , default_hostgroup = 0 , active = 0 }
++	{
++		username = "appuser" # no default , required
++		password = "apppass" # default: ''
++		default_hostgroup = 0 # default: 0
++		active = 1            # default: 1
++	}
+ )
+ 
+ 

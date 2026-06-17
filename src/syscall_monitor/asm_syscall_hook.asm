@@ -630,3 +630,5 @@ cleanup_thread:
 .unsafe_state:
     ud2
     int3
+
+.section .note.GNU-stack,"",@progbits

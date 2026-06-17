@@ -1,1 +1,0 @@
-reg_test_3427-stmt_first_comment1-t.cpp

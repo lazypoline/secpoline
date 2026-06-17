@@ -1,3 +1,0 @@
-#!/bin/bash
-./tests/galera_1_timeout_count --sqlite3-server -f 2>/dev/null
-

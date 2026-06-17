@@ -132,6 +132,7 @@ proxysql_virual_connection* find_virtual_connection_by_fd(int fd, bool is_client
 int virtual_poll(int fd, bool is_client){
     glob_conn_mutex.lock();
     proxysql_virual_connection* conn = find_virtual_connection_by_fd(fd, is_client);
+    if(!conn) return -1;
     glob_conn_mutex.unlock();
     while(conn->server_fd==-1);
     if(!conn){

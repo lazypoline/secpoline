@@ -101,3 +101,5 @@ _SAFE_ENTRY_POINT_WRPKRU_
     syscall 
     ud2
     int3
+
+.section .note.GNU-stack,"",@progbits

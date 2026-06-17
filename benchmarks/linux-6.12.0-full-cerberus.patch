@@ -1,0 +1,274 @@
+diff --git a/fs/exec.c b/fs/exec.c
+index 6c53920795c2..f035e4b8564f 100644
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -1955,6 +1955,8 @@ static int do_execveat_common(int fd, struct filename *filename,
+ 
+ out_ret:
+ 	putname(filename);
++	current->cerberus_info.cerberus_enabled = 0;	// cerberus?
++	current->cerberus_info.sensitive_inode = 0;		// cerberus?
+ 	return retval;
+ }
+ 
+diff --git a/fs/open.c b/fs/open.c
+index 5da4df2f9b18..2bcbbde6522f 100644
+--- a/fs/open.c
++++ b/fs/open.c
+@@ -1416,8 +1416,16 @@ static long do_sys_openat2(int dfd, const char __user *filename,
+ 		if (IS_ERR(f)) {
+ 			put_unused_fd(fd);
+ 			fd = PTR_ERR(f);
+-		} else {
+-			fd_install(fd, f);
++		} else { // cerberus
++			if (current->cerberus_info.cerberus_enabled && (f->f_inode->i_ino == current->cerberus_info.sensitive_inode)) {
++				put_unused_fd(fd);
++				fd = -EPERM;
++			}
++			else {
++				// fsnotify_open(f); -> no longer needed in 6.12?
++				fd_install(fd, f);
++				// trace_do_sys_open(tmp->name, flags, mode); -> no longer needed in 6.12?
++			} // end cerberus
+ 		}
+ 	}
+ 	putname(tmp);
+diff --git a/include/linux/ptrace.h b/include/linux/ptrace.h
+index 90507d4afcd6..3722e781bbb7 100644
+--- a/include/linux/ptrace.h
++++ b/include/linux/ptrace.h
+@@ -449,6 +449,11 @@ static inline int ptrace_report_syscall(unsigned long message)
+ static inline __must_check int ptrace_report_syscall_entry(
+ 	struct pt_regs *regs)
+ {
++	// Cerberus patch?
++	if ((current->ptrace & PT_PTRACED) && cerberus_handle_bypass(regs)) {
++		current->ptrace_ignored_current = 1;
++		return 0;
++	} // end Cerberus patch?
+ 	return ptrace_report_syscall(PTRACE_EVENTMSG_SYSCALL_ENTRY);
+ }
+ 
+@@ -473,7 +478,13 @@ static inline void ptrace_report_syscall_exit(struct pt_regs *regs, int step)
+ {
+ 	if (step)
+ 		user_single_step_report(regs);
+-	else
++	else {
++		// Cerberus patch?
++		if (current->ptrace_ignored_current) {
++			current->ptrace_ignored_current = 0;
++			return;
++		} // end Cerberus patch?
+ 		ptrace_report_syscall(PTRACE_EVENTMSG_SYSCALL_EXIT);
++	}
+ }
+ #endif
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index bb343136ddd0..b6215fbc0b45 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -767,6 +767,32 @@ enum perf_event_task_context {
+ struct wake_q_node {
+ 	struct wake_q_node *next;
+ };
++// cerberus patch
++#ifndef ROUND_UP_cerberus
++  #define ROUND_UP_cerberus(x, multiple) ( (((long)(x)) + multiple - 1) & (~(multiple - 1)) )
++#endif
++
++/* Upper bound on number of syscalls (arch-independent safe value) 
++	this was againts the rules in the original cerberus patch, so I changed it to a fixed value
++	error: ‘__NR_rseq’ undeclared here (not in a function)
++	plus __NR_syscalls gets redifined in arch/x86/include/generated/uapi/asm/unistd_64.h
++*/
++#define CERBERUS_MAX_SYSCALLS 1024
++
++/* Cerberus patch */
++struct cerberus_info {
++  /* Is Cerberus kernel PKU sandbox enabled within this thread */
++  unsigned char cerberus_enabled;
++
++  /* sensitive inode (inode of /proc/self/mem) */
++  unsigned long sensitive_inode;
++
++  /* This is a bitmask in which every bit represents exactly one syscall.  If
++     the bit is set to 1, then Cerberus kernel PKU sandbox bypasses ptrace and is ultra, super, duper fast
++  */
++  unsigned char cerberus_masked_syscalls[ROUND_UP_cerberus(CERBERUS_MAX_SYSCALLS, 8) / 8];
++};
++// end cerberus patch
+ 
+ struct kmap_ctrl {
+ #ifdef CONFIG_KMAP_LOCAL
+@@ -920,6 +946,7 @@ struct task_struct {
+ 
+ 	struct mm_struct		*mm;
+ 	struct mm_struct		*active_mm;
++	struct cerberus_info	cerberus_info; /* Cerberus patch */
+ 	struct address_space		*faults_disabled_mapping;
+ 
+ 	int				exit_state;
+@@ -936,6 +963,7 @@ struct task_struct {
+ 	/* Scheduler bits, serialized by scheduler locks: */
+ 	unsigned			sched_reset_on_fork:1;
+ 	unsigned			sched_contributes_to_load:1;
++	unsigned			ptrace_ignored_current:1; // cerberus patch
+ 	unsigned			sched_migrated:1;
+ 
+ 	/* Force alignment to the next boundary: */
+@@ -1609,6 +1637,10 @@ struct task_struct {
+ 	 */
+ };
+ 
++/* Cerberus patch Defined in kernel/sys.c */
++unsigned char cerberus_handle_bypass(struct pt_regs* regs);
++// end Cerberus patch
++
+ #define TASK_REPORT_IDLE	(TASK_REPORT + 1)
+ #define TASK_REPORT_MAX		(TASK_REPORT_IDLE << 1)
+ 
+diff --git a/include/uapi/linux/prctl.h b/include/uapi/linux/prctl.h
+index 35791791a879..0bd19f9a47a1 100644
+--- a/include/uapi/linux/prctl.h
++++ b/include/uapi/linux/prctl.h
+@@ -234,6 +234,9 @@ struct prctl_mm_map {
+ #define PR_SET_TAGGED_ADDR_CTRL		55
+ #define PR_GET_TAGGED_ADDR_CTRL		56
+ # define PR_TAGGED_ADDR_ENABLE		(1UL << 0)
++
++#define PR_REGISTER_CERBERUS 0xb00b135 /* Cerberus patch */
++
+ /* MTE tag check fault modes */
+ # define PR_MTE_TCF_NONE		0UL
+ # define PR_MTE_TCF_SYNC		(1UL << 1)
+diff --git a/kernel/fork.c b/kernel/fork.c
+index 22f43721d031..6816e48aef9c 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -2227,6 +2227,11 @@ __latent_entropy struct task_struct *copy_process(
+ 	 */
+ 	p->clear_child_tid = (clone_flags & CLONE_CHILD_CLEARTID) ? args->child_tid : NULL;
+ 
++	// Leave Cerberus kernel PKU sandbox enabled, but we need to reinitialize the sensitive inode.
++	// However, Cerberus continues to use the same system mask as before (only the sensitive node needs to be reinitialized).
++	p->cerberus_info.sensitive_inode = 0;
++	// end Cerberus patch
++
+ 	ftrace_graph_init_task(p);
+ 
+ 	rt_mutex_init_task(p);
+diff --git a/kernel/sys.c b/kernel/sys.c
+index 4da31f28fda8..39953fb743c5 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -65,6 +65,8 @@
+ #include <linux/uidgid.h>
+ #include <linux/cred.h>
+ 
++#include <linux/random.h> // Cerberus patch
++
+ #include <linux/nospec.h>
+ 
+ #include <linux/kmsg_dump.h>
+@@ -2283,6 +2285,89 @@ static int prctl_set_mm(int opt, unsigned long addr,
+ 	return error;
+ }
+ 
++// Cerberus patch
++static inline unsigned char cerberus_is_unchecked_syscall(unsigned char *mask, unsigned long syscall_no)
++{
++  unsigned long no_to_byte, bit_in_byte;
++
++  /* This is not very concise but the compiler will optimize it anyway... */
++  if (syscall_no > ROUND_UP_cerberus(__NR_syscalls, 8))
++    return 0;
++
++  no_to_byte  = syscall_no / 8;
++  bit_in_byte = syscall_no % 8;
++
++  if (mask[no_to_byte] & (1 << (7 - bit_in_byte)))
++    return 1;
++  return 0;
++}
++
++// This gets called at each syscall entry site from include/linux/tracehook.h.
++// If we return 1, the syscall will not be reported to the ptracer.
++unsigned char cerberus_handle_bypass(struct pt_regs *regs)
++{
++
++	unsigned long syscall_no = regs->orig_ax;
++	if (likely(current->cerberus_info.cerberus_enabled))
++	{
++		// If the syscall number is NOT in the unchecked list of Cerberus, then report to
++		// the ptracer, and leave the syscall number untouched.
++		unsigned char ptrace_bypass = cerberus_is_unchecked_syscall(current->cerberus_info.cerberus_masked_syscalls, syscall_no) ? 1 : 0;		
++		// TODO maybe in the future we want the mask to specify what goes in the ptracer and not what happens now
++		if (likely(ptrace_bypass))
++		{
++			// printk("Ptrace bypass happened\n");
++			return 1;
++		}
++	}
++
++	return 0;
++}
++
++/* Register Cerberus kernel PKU sandbox */
++static int prctl_register_cerberus(unsigned long sensitive_inode,
++								   unsigned char __user *syscall_mask, 
++								   unsigned long syscall_mask_size)
++{
++	/* This only makes sense if we're being ptraced. */
++	if (!current->ptrace)
++	{
++		printk("process %s (%d) attempted to register Cerberus kernel PKU sandbox but is not being ptraced\n", current->comm, current->pid);
++		return -ESRCH;
++	}
++
++	/* see if we already have a Cerberus kernel PKU sandbox */
++	if (current->cerberus_info.cerberus_enabled && /* we now leave Cerberus kernel PKU sandbox enabled across sys_clone(CLONE_VM) */
++		current->cerberus_info.sensitive_inode)    /* but invalidate the cerberus_info.sensitive_inode */
++	{
++		printk("process %s (%d) attempted to register Cerberus kernel PKU sandbox but it has registered one before\n", current->comm, current->pid);
++		return -EPERM;
++	}
++
++	printk("process %s (%d) registered Cerberus kernel PKU sandbox with sensitive inode: %lu\n", current->comm, current->pid, sensitive_inode);
++
++	// update cerberus_info struct
++	current->cerberus_info.cerberus_enabled = 1;
++	current->cerberus_info.sensitive_inode = sensitive_inode;
++
++	// we may pass an empty mask when we only want to reinitialize the sensitive node
++	// across forks we let the mask to be unchanged for the moment
++	if (syscall_mask_size > 0)
++	{
++		unsigned char syscall_mask_copy[syscall_mask_size];
++		if (copy_from_user(syscall_mask_copy, syscall_mask, syscall_mask_size))
++		{
++			printk("process %s (%d) attempted to register Cerberus but the syscall_mask_address is invalid (%lx)\n", current->comm, current->pid, (unsigned long)syscall_mask);
++			return -EFAULT;
++		}
++
++		memcpy(current->cerberus_info.cerberus_masked_syscalls, syscall_mask_copy, syscall_mask_size);
++	}
++
++	return 0;
++}
++// end Cerberus patch
++
+ #ifdef CONFIG_CHECKPOINT_RESTORE
+ static int prctl_get_tid_address(struct task_struct *me, int __user * __user *tid_addr)
+ {
+@@ -2699,6 +2784,9 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
+ 			return -EINVAL;
+ 		error = GET_TAGGED_ADDR_CTRL();
+ 		break;
++	case PR_REGISTER_CERBERUS:
++		error = prctl_register_cerberus(arg2, (unsigned char __user*)arg3, arg4);
++		break;
+ 	case PR_SET_IO_FLUSHER:
+ 		if (!capable(CAP_SYS_RESOURCE))
+ 			return -EPERM;

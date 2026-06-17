@@ -143,6 +143,7 @@ struct kernel_sigaction SignalHandlers::set_app_handler(int signo, const struct 
 }
 
 long long SignalHandlers::handle_app_sigaction(int signo, struct kernel_sigaction *newact, struct kernel_sigaction *oldact) {
+    assert(signo < 128 && signo > 0);
     // hold lock while operating on the app_handlers
     std::lock_guard guard{mut};
 

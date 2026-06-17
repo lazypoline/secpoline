@@ -37,7 +37,7 @@ char is_multithreaded = 0;
 extern fd_bitmap untrusted_fd_bitmap;
 virt_page_manager page_manager;
 pthread_rwlock_t mmap_lock = PTHREAD_RWLOCK_INITIALIZER;
-extern int connect_fd;
+static int connect_fd;
 
 
 //TODO the return value of the actual handlers is ignored, only the gadgets return if the syscall should be emulated
@@ -91,7 +91,7 @@ SYSCALL_HANDLER(brk){
     //if the heap is expanded tag new pages as unprotected
     if((gprs->arg1() > old_break)&&(result>0)){
         int delta_size = gprs->arg1() - old_break;
-        assert(page_manager.add_page((char*)old_break, delta_size, PROT_READ|PROT_WRITE, TS_APPLICATION, false)==0);
+        assert(page_manager.add_page((char*)old_break, delta_size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, TS_APPLICATION, false)==0);
         assert(do_syscall_untrusted(old_break, delta_size, PROT_READ|PROT_WRITE, UNTRUSTED_MPKEY, 0, 0, __NR_pkey_mprotect)==0);
     }
 
@@ -103,6 +103,31 @@ SYSCALL_HANDLER(brk){
 //Prevent pages from being writable and executable
 //Scan new executable pages for unsafe instructions
 SYSCALL_HANDLER(mprotect){
+
+/*
+#if TRACK_MAPPINGS
+    virt_page* current_page = page_manager.lookup_addr((char*)gprs->arg1(), TS_APPLICATION);
+    if(current_page == NULL){
+        asm("ud2");
+        (*gprs)[REG_RAX] = -EINVAL;
+        return false; 
+    }
+
+    //TODO, just check each page in the range, instead of forcing it to be one range
+    if(!!(gprs->arg3() & PROT_EXEC)){
+        if((current_page->start != (char*)gprs->arg1()) || (current_page->size != gprs->arg2())){
+            asm("ud2");
+            (*gprs)[REG_RAX] = -EINVAL;
+            return false; 
+        }
+        if(!(current_page->flags&MAP_ANONYMOUS) && !(current_page->flags&MAP_ANON)){
+            asm("ud2");
+            (*gprs)[REG_RAX] = -EINVAL;
+            return false; 
+        }
+    }
+#endif
+*/
     if(page_manager.lookup_range((char*)gprs->arg1(), gprs->arg2(), TS_APPLICATION) == NULL){
         (*gprs)[REG_RAX] = -EINVAL;
         return false;
@@ -490,13 +515,16 @@ SYSCALL_HANDLER(pre_close_proxysql){
 }
 
 SYSCALL_HANDLER(connect_proxysql){
-    struct sockaddr addr;
-    memcpy_untrusted_to_trusted(&addr, (void*)gprs->arg2(), gprs->arg3());
-    int res = setup_virual_connection(gprs->arg1(), &addr);
+    struct sockaddr* addr = (struct sockaddr*)malloc(gprs->arg3());
+    memcpy_untrusted_to_trusted(addr, (void*)gprs->arg2(), gprs->arg3());
+    int res = setup_virual_connection(gprs->arg1(), addr);
     if(res == -1){
+        clear_virual_connection(gprs->arg1());
+        free(addr);
         (*gprs)[REG_RAX] = -EINVAL;
         return false;
     }
+    free(addr);
     connect_fd = gprs->arg1();
     gprs->do_syscall();
     return false;
