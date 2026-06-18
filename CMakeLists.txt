@@ -56,21 +56,23 @@ file(GLOB_RECURSE SEGFAULT_HANDLER_SOURCES CONFIGURE_DEPENDS
     src/segfault_handler/*.asm
 )
 
-add_library(libproxysql SHARED IMPORTED)
-set_target_properties(libproxysql PROPERTIES IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}/proxysql/src/proxysql.so")
+add_custom_command(
+    OUTPUT ${CMAKE_SOURCE_DIR}/libproxysql/proxysql/src/proxysql.so
+    COMMAND make -j
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/libproxysql
+)
+add_custom_target(proxysql_build ALL DEPENDS ${CMAKE_SOURCE_DIR}/libproxysql/proxysql/src/proxysql.so)
+add_library(proxysql SHARED IMPORTED GLOBAL)
+set_target_properties(proxysql PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/libproxysql/proxysql/src/proxysql.so)
+add_dependencies(proxysql proxysql_build)
 
 #creates secpoline
 add_executable(secpoline ${SECPOLINE_SOURCES})
 target_compile_options(secpoline PUBLIC ${SECPOLINE_OPTIONS})
 target_link_options(secpoline PUBLIC ${COMMON_LINK_OPTIONS}  -lssl -lcrypto  -ldl -lpthread -laudit)
 target_include_directories(secpoline PUBLIC ${PROJECT_SOURCE_DIR}/src/include)
-target_link_libraries(secpoline PRIVATE libproxysql)
+target_link_libraries(secpoline PRIVATE proxysql)
 
-#creates libsegfault_handler.so
-add_library(segfault_handler SHARED ${SEGFAULT_HANDLER_SOURCES})
-target_compile_options(segfault_handler PUBLIC ${COMMON_COMPILE_OPTIONS} ${OPTIMIZATION})
-target_link_options(segfault_handler PUBLIC ${OPTIMIZATION} -static-libstdc++ -static-libgcc)
-target_include_directories(segfault_handler PUBLIC ${PROJECT_SOURCE_DIR}/src/include)
 
 #creates libloader.so
 add_subdirectory(src/secpoline_loader)

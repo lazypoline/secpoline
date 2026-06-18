@@ -249,7 +249,6 @@ index aa78d0f79..9c5ed6d10 100644
  
 -	watchdog_main_loop();
 +	//watchdog_main_loop();
-+	proxy_info("\n\n\n\n\n\n\n\nEnding it all:(\n\n\n\n\n\n\n\n");
 +	return 1;
 +}
  
