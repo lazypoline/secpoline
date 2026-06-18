@@ -381,39 +381,9 @@ asm_syscall_hook:
 
 
     pushq %rax
-    pushq %rcx
-
     /*store the untrusted tls in gsreldata*/
-    movq 0x28(%rsp), %rcx
-    movq %rcx, %gs:FS_BASE_OFFSET
-
-
-    /*backup secure stack pointer*/
-    movq %rsp, %rax
-    addq $48, %rax /*the top the the trusted stack(rax) now contains the pointer to the address of start_thread() and its arguments*/
-    /*now we need to setup the sigaltstack*/
-    pushq %rdi
-    pushq %rsi
-    pushq %r11
-    movq %gs:SIG_ALTSTACK_BASE_OFFSET, %rdi
-    subq %rdi, %rax /*rax contains sigaltstack size*/
-    movq %rax, %gs:SIG_ALTSTACK_SIZE_OFFSET
-    movq $0, %rsi
-    rdgsbase %rdi
-    addq $SIG_ALTSTACK_BASE_OFFSET, %rdi /*rdi points to stack_t struct in gsreldata*/
-    movq $__NR_sigaltstack, %rax
-    movq %rsp, %r9
-    movq $0, %rsp
-    movq $0, %gs:SUD_SELECTOR_OFFSET
-    syscall
-    movq $1, %gs:SUD_SELECTOR_OFFSET
-    movq %r9, %rsp
-    cmpq $0, %rax
-    jne .unsafe_state
-    popq %r11
-    popq %rsi
-    popq %rdi
-    popq %rcx
+    movq 0x20(%rsp), %rax
+    movq %rax, %gs:FS_BASE_OFFSET
 
     /*put the untrusted stack in gsreldata*/
     movq 0x8(%rsp), %rax
@@ -422,7 +392,7 @@ asm_syscall_hook:
     addq $0x20, %rsp /*discard untrusted rsp,  on stack*/
 
     /*now every register is still correct, the untrusted stack and tls are in gsreldata*/
-    /*the trusted stack contains the pointer to start thread and its arguments*/
+    /*the trusted stack contains the pointer to start thread() and its arguments*/
     /*now we need to save every register so that they can be restored after start_thread() when returning to the application*/
     xchg %rax, (%rsp) /*start_thread() -> rax*/
     addq $8, %rsp
@@ -577,6 +547,7 @@ fake_thread_main_routine:
     pushq %rbx
     pushq %rbp
 
+
     /*switch stacks and tls, now we can still clobber registers*/
     rdfsbase %rax
     xchg %rax, %gs:FS_BASE_OFFSET
@@ -600,6 +571,33 @@ fake_thread_main_routine:
     movq 0x38(%r15), %r15
 
     movq %rsp, %gs:THREAD_CLEANUP_RSP_OFFSET /*we use this rsp when returning here to cleanup the trusted parts of this thread*/
+
+    /*NOW update the sigaltstack*/
+    /*rcx can be clobbered at this point as it will be set by lower_privileges anyway*/
+    movq %rsp, %rcx
+    /*now we need to setup the sigaltstack*/
+    pushq %rdi
+    pushq %rsi
+    pushq %r11
+    movq %gs:SIG_ALTSTACK_BASE_OFFSET, %rdi
+    subq %rdi, %rcx /*rcx contains sigaltstack size*/
+    movq %rcx, %gs:SIG_ALTSTACK_SIZE_OFFSET
+    movq $0, %rsi
+    rdgsbase %rdi
+    addq $SIG_ALTSTACK_BASE_OFFSET, %rdi /*rdi points to stack_t struct in gsreldata*/
+    movq $__NR_sigaltstack, %rax
+    movq %rsp, %r9
+    movq $0, %rsp
+    movq $0, %gs:SUD_SELECTOR_OFFSET
+    syscall
+    movq $1, %gs:SUD_SELECTOR_OFFSET
+    movq %r9, %rsp
+    cmpq $0, %rax
+    jne .unsafe_state
+    popq %r11
+    popq %rsi
+    popq %rdi
+
     
     xchg %gs:SECURE_STACK_SP_OFFSET, %rsp
     movq %rsp, %rsi /*rsi contains untrusted stack*/
@@ -630,3 +628,5 @@ cleanup_thread:
 .unsafe_state:
     ud2
     int3
+
+.section .note.GNU-stack,"",@progbits
