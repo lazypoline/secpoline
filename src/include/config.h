@@ -10,9 +10,7 @@
 #define EXCLUSIVE_MPK_POLICY        1
 #define PREVENT_MUTABLE_MAPS        1
 #define MMAP_LOCK                   1
+#define SAVE_VECTOR_REGS            1
 
 #define PREVENT_NULL_DEREF          1
-
 #define REWRITE_TO_ZPOLINE          1
-#define SAVE_VECTOR_REGS            1
-#define RETURN_IMMEDIATELY          0

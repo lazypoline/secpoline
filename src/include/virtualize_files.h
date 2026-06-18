@@ -5,16 +5,16 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <shared_mutex>
+#include <unistd.h>
 #include <mutex>
-
 //bitmap that store the used fd
 class fd_bitmap{
 private:
     char* map = nullptr;
     size_t size; //size in bytes
-    mutable std::shared_mutex mtx; //read/write lock
 
 public:
+    mutable std::shared_mutex mtx; //read/write lock
     fd_bitmap(){
         map = (char*)calloc(sizeof(size_t), 1);
         size = 1;
@@ -55,7 +55,7 @@ public:
     }
 
     int unset_bit(size_t index){
-        std::unique_lock<std::shared_mutex> lock(mtx);
+
         size_t byte_index = index/8;
 
         if(byte_index >= size){

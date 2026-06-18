@@ -116,9 +116,9 @@ void init_page_manager(mmapped_list_s* loader_mappings){
     }
 
     //tag vvar and vdso as trusted but readable by the untrusted applciation
-    assert(page_manager.add_page((char*)loader_mappings->vdso.start_address, loader_mappings->vdso.size, loader_mappings->vdso.permissions, TS_MONITOR, false)==0);
+    assert(page_manager.add_page((char*)loader_mappings->vdso.start_address, loader_mappings->vdso.size, loader_mappings->vdso.permissions, 0, TS_MONITOR, false)==0);
     assert(inline_syscall6(__NR_pkey_mprotect, (void*)loader_mappings->vdso.start_address, loader_mappings->vdso.size, loader_mappings->vdso.permissions, SECPOLINE_READONLY_MPKEY, 0, 0)==0);
-    assert(page_manager.add_page((char*)loader_mappings->vvar.start_address, loader_mappings->vvar.size, loader_mappings->vvar.permissions, TS_MONITOR, false)==0);
+    assert(page_manager.add_page((char*)loader_mappings->vvar.start_address, loader_mappings->vvar.size, loader_mappings->vvar.permissions, 0, TS_MONITOR, false)==0);
     assert(inline_syscall6(__NR_pkey_mprotect, (void*)loader_mappings->vvar.start_address, loader_mappings->vvar.size, loader_mappings->vvar.permissions, SECPOLINE_READONLY_MPKEY, 0, 0)==0);
 
     //need to retag gsreldata readable data
@@ -155,7 +155,7 @@ void init_page_group(char* start, char* end, int prot, int is_segfault_handler, 
 
         }
         //these can always be tagged as a full group, as no protections are changed here
-        assert(page_manager.add_page(start, size, prot, TS_MONITOR, false)==0);
+        assert(page_manager.add_page(start, size, prot, 0, TS_MONITOR, false)==0);
         assert(inline_syscall6(__NR_pkey_mprotect, start, size, prot, SECPOLINE_MPKEY, 0, 0) == 0);
         return;
     }
@@ -166,7 +166,7 @@ void init_page_group(char* start, char* end, int prot, int is_segfault_handler, 
         for(char* address = start; address < end;address+=PAGE_SIZE){
             add_unsafe_page(address, prot, prot|PROT_EXEC, cid==TS_MONITOR, NULL);
         }
-        assert(page_manager.add_page(start, size, prot, cid, false)==0);
+        assert(page_manager.add_page(start, size, prot, 0, cid, false)==0);
         assert(inline_syscall6(__NR_pkey_mprotect, start, size, prot, get_pkey(cid), 0, 0) == 0);
         return;
     }
@@ -174,12 +174,12 @@ void init_page_group(char* start, char* end, int prot, int is_segfault_handler, 
     //scan all executable pages for unsafe instructions
     //this also pkey_mprotects them and adds them to the page_manager
     if(prot&PROT_EXEC){
-        scan_exec_mapping(start, size, prot, prot&~PROT_EXEC, false, cid, allow_list);
+        scan_exec_mapping(start, size, prot, prot&~PROT_EXEC, 0, false, cid, allow_list);
         return;
     }
 
     //the mmappings are not executable so just tage them and add them to the page manager
-    assert(page_manager.add_page(start, size, prot, cid, false)==0);
+    assert(page_manager.add_page(start, size, prot, 0, cid, false)==0);
     assert(inline_syscall6(__NR_pkey_mprotect, start, size, prot, get_pkey(cid), 0, 0) == 0);
     return;
 }

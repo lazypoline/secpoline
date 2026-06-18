@@ -16,6 +16,7 @@
 
 #include <immintrin.h>
 #include <dlfcn.h>
+#include <ctype.h>
 #include <sys/uio.h>
 
 stack_t* map_sig_stack(){
@@ -112,14 +113,14 @@ void handle_sigtrap(int signo) {
 
 void* thread_start(void*) {
     for (int i = 0; i < 5; i++) {
-        fprintf(stderr, "Hello from thread!\n");
+        fprintf(stderr, "Hello from thread! %d\n", get_nprocs());
     }
     return NULL;
 }
 
 
 int main() {
-    fprintf(stderr, "starting main!\n");
+    fprintf(stderr, "starting main! %d\n", get_nprocs());
 
     fprintf(stderr, "command ended!\n");
     pthread_t thread1;

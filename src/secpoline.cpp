@@ -221,11 +221,6 @@ static void generate_2d_handler_list(syscall_handlers_struct table[], syscall_ha
 extern "C" uint64_t secpoline_syscall_handler(long long* gp_regs) {
     gprs_desc gprs{gp_regs};
     long long syscall_no = gprs[REG_RAX];
-
-    #if RETURN_IMMEDIATELY
-        // early return used for benchmarking the nop sled
-        return 0;
-    #endif
         
 #if PRE_PRINT_SYSCALLS
         // common precall

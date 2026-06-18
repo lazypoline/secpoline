@@ -179,8 +179,8 @@ extern "C" void setup_new_thread(unsigned long long clone_flags, void* secure_st
     update_active_thread_list(false);
     
     nolibc_assert(inline_syscall6(__NR_rt_sigprocmask, SIG_SETMASK, &old_mask, 0, SIGSETSIZE, 0, 0) == 0);
-    nolibc_assert(page_manager.add_page((char*)gsreldata, sizeof(GSRelativeData), PROT_READ|PROT_WRITE, TS_MONITOR, false)==0);
-    if(!(clone_flags & CLONE_SIGHAND))nolibc_assert(page_manager.add_page((char*)gsreldata->signal_handlers, sizeof(SignalHandlers), PROT_READ|PROT_WRITE, TS_MONITOR, false)==0);
+    nolibc_assert(page_manager.add_page((char*)gsreldata, sizeof(GSRelativeData), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, TS_MONITOR, false)==0);
+    if(!(clone_flags & CLONE_SIGHAND))nolibc_assert(page_manager.add_page((char*)gsreldata->signal_handlers, sizeof(SignalHandlers), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, TS_MONITOR, false)==0);
     //nolibc_assert(inline_syscall6(__NR_tgkill, nolibc_getpid(), nolibc_gettid(), SIGSEGV, 0, 0, 0) == 0); //the signal wil have si_code SI_USER
 
 

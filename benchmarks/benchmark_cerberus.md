@@ -56,7 +56,7 @@ wrk:
     sudo taskset -c 6-11 wrk/wrk -t6 -c24 -d10s --timeout 10s http://127.0.0.1:3000/index.html # apache 4 workers
     sudo  taskset  -c  8-11  wrk/wrk  -t8  -c64  -d10s  --timeout 10s  http://127.0.0.1:3000/index.html   # apache 64 workers
 
-For the config, change the file in apache at: `/apache/httpd-binary/conf/extra/http-mpm.conf`.
+For the config, change the file in apache at: `/apache/httpd-binary/conf/extra/httpd-mpm.conf`.
 
     # 1. For Prefork (Single Process)
     <IfModule mpm_prefork_module>

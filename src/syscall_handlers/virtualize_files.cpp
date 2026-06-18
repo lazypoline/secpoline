@@ -17,6 +17,7 @@ SYSCALL_HANDLER(save_untrusted_fd){
     if(fd < 0)return false;
 
     untrusted_fd_bitmap.set_bit(fd);
+    //fprintf(stderr, "[%d/%d] %d -> created fd %d\n", getpid(), gettid(), syscall_no, fd);
     return false;
 }
 
@@ -24,12 +25,15 @@ SYSCALL_HANDLER(save_untrusted_fd){
 //Closing a fd, so make sure to remove it from the bitmap
 //TODO, when the close fails readd the fd
 SYSCALL_HANDLER(close){
+    //TODO update the locking for all fd related functions
+    std::unique_lock<std::shared_mutex> lock(untrusted_fd_bitmap.mtx);
     int fd = gprs->arg1();
 
     if(gprs->do_syscall()){
         return false;
     }
 
+    //fprintf(stderr, "[%d/%d] %d -> closing fd %d\n", getpid(), gettid(), syscall_no, fd);
     untrusted_fd_bitmap.unset_bit(fd);
     return false;
 }
@@ -120,6 +124,8 @@ SYSCALL_HANDLER(open){
 }
 
 SYSCALL_HANDLER(close_range){
+    assert(0);
+    //TODO this should also clear the bits.
     //TODO, if the range is big enough, than we can probably do larger compares to speed this up
     int start = gprs->arg1();
     int last = gprs->arg1();

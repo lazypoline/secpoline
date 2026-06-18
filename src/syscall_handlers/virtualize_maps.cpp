@@ -9,6 +9,7 @@
 //Do not call any outside code here as this code is shared between the meta monitor
 size_t secpoline_mmap(size_t start, size_t size, size_t prot, size_t flags, size_t fd, size_t offset, int cid){
     int key = get_pkey(cid);
+    if(cid==TS_MONITOR) nolibc_assert(gsreldata->readable_data.sud_selector==SYSCALL_DISPATCH_FILTER_ALLOW);
     if(key == -1) return -EINVAL;
     int is_exec = (!!(prot & PROT_EXEC));
     int is_write = (!!(prot & PROT_WRITE));
@@ -21,10 +22,7 @@ size_t secpoline_mmap(size_t start, size_t size, size_t prot, size_t flags, size
     }
 
 #if PREVENT_MUTABLE_MAPS
-    if(flags&MAP_SHARED){
-        flags &= ~MAP_SHARED;
-        flags |= MAP_ANONYMOUS;
-    }
+    flags |= MAP_PRIVATE;
 #endif
 
     if(flags&MAP_FIXED){
@@ -53,6 +51,7 @@ size_t secpoline_mmap(size_t start, size_t size, size_t prot, size_t flags, size
     int64_t result;
 #if PREVENT_MUTABLE_MAPS
     if(fd != -1 && fd != 0){
+        //prevent executable mappings from being file backed, as this allows attackers to insert wrpkru instruction through writes to the file
         result = map_file_baked(start, size, prot, flags, fd, offset, cid);
     }else{
         result = syscall_wrapper(__NR_mmap, start, size, prot, flags, -1, 0, cid);
@@ -70,7 +69,7 @@ size_t secpoline_mmap(size_t start, size_t size, size_t prot, size_t flags, size
         if(cid == TS_MONITOR){
             set_sud_block();
         }
-        scan_exec_mapping((char*)result, size, real_prot, real_prot&~PROT_EXEC, flags&MAP_FIXED, cid, NULL);
+        scan_exec_mapping((char*)result, size, real_prot, real_prot&~PROT_EXEC, flags, flags&MAP_FIXED, cid, NULL);
         if(cid == TS_MONITOR){
             set_sud_allow();
         }
@@ -78,7 +77,7 @@ size_t secpoline_mmap(size_t start, size_t size, size_t prot, size_t flags, size
     }
 
 
-    assert(page_manager.add_page((char*)result, size, prot, cid, flags&MAP_FIXED)==0);
+    assert(page_manager.add_page((char*)result, size, prot, flags, cid, flags&MAP_FIXED)==0);
     assert(syscall_wrapper(__NR_pkey_mprotect, (int64_t)result, size, prot, key, 0, 0, cid)==0);
 
     //if the pages can be executable, mark it as such so the segfault handler knows it.
@@ -127,13 +126,13 @@ size_t map_file_baked(size_t start, size_t size, size_t prot, size_t flags, size
 
 //scan the page for unsafe instructions and mprotect it with the correct key and protections
 //also adds the group to the page_manager
-void scan_exec_mapping(char* start, size_t size, int prot, int unsafe_prot, int map_fixed, int cid, std::vector<unsigned long long>* allow_list){
+void scan_exec_mapping(char* start, size_t size, int prot, int unsafe_prot, int flags, int map_fixed, int cid, std::vector<unsigned long long>* allow_list){
     //nolibc_print_size_t_hex("exec start", (size_t)start);
     //nolibc_print_size_t_hex("exec end", (size_t)start+size);
     int key = get_pkey(cid);
     if(key == -1) return;
 #if !SCAN_UNSAFE_INSTRUCTIONS
-        assert(page_manager.add_page(start, size, prot, cid, map_fixed)==0);
+        assert(page_manager.add_page(start, size, prot, flags, cid, map_fixed)==0);
         assert(inline_syscall6(__NR_pkey_mprotect, (int64_t)start, size, prot, key, 0, 0)==0);
         return;
 #endif
@@ -156,12 +155,12 @@ void scan_exec_mapping(char* start, size_t size, int prot, int unsafe_prot, int 
         //unsafe pages are put in a seperate page manarger group
         unsafe_page* erim_ret = erim_memScanRegion(page, PAGE_SIZE, allow_list_data, allow_list_size, prot, prot&~PROT_EXEC, false, &prev_page);
         if((prev_page==(char*)-1)){
-            nolibc_print_size_t_hex("prev page", (size_t)page-PAGE_SIZE);
+            //nolibc_print_size_t_hex("prev page", (size_t)page-PAGE_SIZE);
             //the previous page contains unsafe instructions, so reduce the current group by page_size
             //if group_size == PAGE_SIZE, then the last page was the only one in the group
             if(group_size != 0){
                 group_size -= PAGE_SIZE;
-                assert(page_manager.add_page((char*)page-PAGE_SIZE, PAGE_SIZE, unsafe_prot, cid, map_fixed)==0);
+                assert(page_manager.add_page((char*)page-PAGE_SIZE, PAGE_SIZE, unsafe_prot, flags, cid, map_fixed)==0);
                 assert(inline_syscall6(__NR_pkey_mprotect, (int64_t)page-PAGE_SIZE, PAGE_SIZE, unsafe_prot, key, 0, 0)==0);
             }
         }
@@ -169,14 +168,18 @@ void scan_exec_mapping(char* start, size_t size, int prot, int unsafe_prot, int 
         if(erim_ret || (prev_page==(char*)-1)){
             if(group_size != 0){
                 //now add all previous mappings to a group and mprotect them
-                assert(page_manager.add_page((char*)start_group, group_size, prot, cid, map_fixed)==0);
+                assert(page_manager.add_page((char*)start_group, group_size, prot, flags, cid, map_fixed)==0);
                 assert(inline_syscall6(__NR_pkey_mprotect, (int64_t)start_group, group_size, prot, key, 0, 0)==0);
+
+                //now we sperated the prev page, the group starts at this page
+                group_size = 0;
+                start_group = page;
             }
         }
         
         if(erim_ret){
             //and add the actual unsafe page
-            assert(page_manager.add_page((char*)page, PAGE_SIZE, unsafe_prot, cid, map_fixed)==0);
+            assert(page_manager.add_page((char*)page, PAGE_SIZE, unsafe_prot, flags, cid, map_fixed)==0);
             assert(inline_syscall6(__NR_pkey_mprotect, (int64_t)page, PAGE_SIZE, unsafe_prot, key, 0, 0)==0);
 
             group_size = 0;
@@ -192,7 +195,7 @@ void scan_exec_mapping(char* start, size_t size, int prot, int unsafe_prot, int 
     //now we have reached the end, mprotect the last group
     if(group_size == 0) return;
 
-    assert(page_manager.add_page((char*)start_group, group_size, prot, cid, map_fixed)==0);
+    assert(page_manager.add_page((char*)start_group, group_size, prot, flags, cid, map_fixed)==0);
     assert(inline_syscall6(__NR_pkey_mprotect, (int64_t)start_group, group_size, prot, key, 0, 0)==0);
     return;
 }
@@ -329,7 +332,7 @@ char* handle_mremap(char* start, size_t old_size, size_t new_size, int flags, ch
             assert(new_addr > (char*)0);
             
             //at this point the removal is done, so we cannot return if someting fails
-            assert(page_manager.add_page(new_addr, new_size, prot, cid, false)==0);
+            assert(page_manager.add_page(new_addr, new_size, prot, flags, cid, false)==0);
             return new_addr;
 
         }else{
@@ -356,6 +359,6 @@ char* handle_mremap(char* start, size_t old_size, size_t new_size, int flags, ch
     assert(new_addr > (char*)0);
     
     //at this point the removal is done, so we cannot return if someting fails
-    assert(page_manager.add_page(new_addr, new_size, prot, cid, false)==0);
+    assert(page_manager.add_page(new_addr, new_size, prot, cid, flags, false)==0);
     return new_addr;
 }

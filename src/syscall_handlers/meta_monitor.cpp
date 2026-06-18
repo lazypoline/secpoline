@@ -106,6 +106,8 @@ extern "C" size_t meta_monitor(size_t arg1, size_t arg2, size_t arg3, size_t arg
         return inline_syscall6(syscall_no, arg1, arg2, arg3, arg4, arg5, arg6);
     }
 
+
+    //TODO prevent making non-anon pages executable
     if (syscall_no == __NR_mprotect) {
         nolibc_assert(!(arg3&MAP_HUGETLB));
 
@@ -160,7 +162,9 @@ extern "C" size_t meta_monitor(size_t arg1, size_t arg2, size_t arg3, size_t arg
                 return inline_syscall6(syscall_no, arg1, arg2, arg3, arg4, arg5, arg6);
             }else if(newact->k_sa_handler!=(decltype(newact->k_sa_handler)) asm_signal_entry){
                 newact->sa_flags &= ~SA_RESETHAND;
-                nolibc_assert(newact->sa_flags&SA_SIGINFO && newact->sa_flags&SA_ONSTACK && newact->sa_flags&SA_NODEFER);
+                newact->sa_flags &= ~SA_SIGINFO;
+                newact->sa_flags &= ~SA_ONSTACK;
+                newact->sa_flags &= ~SA_NODEFER;
                 return inline_syscall6(syscall_no, arg1, NULL, arg3, arg4, arg5, arg6);
             }else{
                 return inline_syscall6(syscall_no, arg1, arg2, arg3, arg4, arg5, arg6);

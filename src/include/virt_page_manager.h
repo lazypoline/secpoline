@@ -12,15 +12,17 @@ struct virt_page{
     char* start;
     size_t size;
     int prot;
+    int flags;
     int Cid; //compartment ID
 
     struct virt_page* next;
+    char padding[24];
 };
 
 //all sizes are in bytes
 class virt_page_manager{
     public:
-        int add_page(char* start, size_t size, int perm, int cid, bool map_fixed);
+        int add_page(char* start, size_t size, int prot, int flags, int cid, bool map_fixed);
         int remove_page(char* start, size_t size, int cid);
         int update_mprotect(char* start, size_t size, int prot, int cid);
         int update_size(char* start, size_t old_size, size_t new_size, int cid);
@@ -37,7 +39,7 @@ class virt_page_manager{
         struct virt_page* free_pages = NULL;
         pthread_rwlock_t lock = PTHREAD_RWLOCK_INITIALIZER;
 
-        int add_page_locked(char* start, size_t size, int prot, int cid, bool map_fixed, struct virt_page* p1);
+        int add_page_locked(char* start, size_t size, int prot, int flags, int cid, bool map_fixed, struct virt_page* p1);
         int remove_page_locked(char* start, size_t size, int cid);
         int remove_page_map_fixed_locked(char* start, size_t size, int cid);
         int update_mprotect_locked(char* start, size_t size, int prot, int cid);
@@ -61,7 +63,7 @@ class virt_page_manager{
 extern virt_page_manager page_manager;
 
 
-void scan_exec_mapping(char* start, size_t size, int prot, int unsafe_prot, int map_fixed, int cid, std::vector<unsigned long long>* allow_list);
+void scan_exec_mapping(char* start, size_t size, int prot, int unsafe_prot, int flags, int map_fixed, int cid, std::vector<unsigned long long>* allow_list);
 void scan_exec_mapping_mprotect(char* start, size_t size, int prot, int unsafe_prot, int cid, std::vector<unsigned long long>* allow_list);
 char* handle_mremap(char* start, size_t old_size, size_t new_size, int flags, char* new_start, int cid);
 char* handle_mremap_exec(char* start, size_t old_size, size_t new_size, int flags, char* new_start, int prot, int cid);

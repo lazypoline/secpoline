@@ -58,7 +58,7 @@ void get_mappings(char** start, char** end){
         end_ptr = line;
         if (!*end_ptr) continue;
 
-        if(!strstr(line, "/home/ruben-sturm/lazypoline/output/libsegfault_handler.so")) continue;
+        if(!strstr(line, "/output/libsegfault_handler.so")) continue;
         //extract start and end adress of memory maping
         //star_adress-end_adress rwxp ....
         uint64_t mapping_start = strtoll(end_ptr, &end_ptr, 16);
