@@ -4,7 +4,7 @@
 ```bibtex
 @inproceedings{sturm2026secpoline,
   title={Secpoline: A Scalable Approach to Build Secure In-Process Syscall Interposers},
-  author={Sturm, Ruben and  Schelfhout, Anton and G{\"u}lmez, Merve and Jacobs, Adriaan and and Volckaert, Stijn},
+  author={Sturm, Ruben and  Schelfhout, Anton and G{\"u}lmez, Merve and Jacobs, Adriaan and Volckaert, Stijn},
   booktitle={Proceedings of the 35th USENIX Security Symposium (USENIX Security 2026)},
   year={2026},
   publisher={USENIX Association}

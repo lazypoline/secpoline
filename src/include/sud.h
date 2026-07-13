@@ -12,9 +12,7 @@
 # define SYSCALL_DISPATCH_FILTER_BLOCK	1
 #endif
 
-#ifndef SYS_USER_DISPATCH
-# define SYS_USER_DISPATCH 2	/* syscall user dispatch triggered */
-#endif
+# define SYS_USER_DISPATCH_INTERNAL 2	/* syscall user dispatch triggered */
 
 inline void set_sud_allow(){
     gsreldata->readable_data.sud_selector = SYSCALL_DISPATCH_FILTER_ALLOW;

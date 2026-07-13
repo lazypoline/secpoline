@@ -40,7 +40,7 @@ extern "C" size_t meta_monitor(size_t arg1, size_t arg2, size_t arg3, size_t arg
         size_t size = ((arg2 + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE; //allign the size to page_size
         size_t prot = arg3;
         size_t flags = arg4;
-        size_t fd = arg5;
+        int fd = arg5;
         size_t offset = arg6;
 #if MMAP_LOCK
         nolibc_assert(pthread_rwlock_wrlock(&mmap_lock) == 0);
