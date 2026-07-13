@@ -121,7 +121,7 @@ done
 
 echo "[*] Starting Secpoline loop ($ITERATIONS iterations)..."
 
-for i in $(seq 1 0); do
+for i in $(seq 1 $ITERATIONS); do
     echo "--- Run $i ---"
     
     # Ensure a clean slate for the zip target file
