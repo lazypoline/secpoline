@@ -16,14 +16,14 @@
 int virt_page_manager::add_page(char* start, size_t size, int prot, int flags, int cid, bool map_fixed){
 #if TRACK_MAPPINGS
     char selector = get_sud();
-    assert(pthread_rwlock_wrlock(&lock) == 0);
+    lock.lock();
     set_sud_allow();
     struct virt_page* p1 = virt_page_alloc();
     int ret = add_page_locked(start, size, prot, flags, cid, map_fixed, p1);
     if(ret == -1){
         virt_page_free(p1);
     }
-    assert(pthread_rwlock_unlock(&lock)==0);
+    lock.unlock();
     (selector == SYSCALL_DISPATCH_FILTER_ALLOW) ? set_sud_allow() : set_sud_block();
     return ret;
 #else 
@@ -120,10 +120,10 @@ int virt_page_manager::add_page_locked(char* start, size_t size, int prot, int f
 int virt_page_manager::remove_page(char* start, size_t size, int cid){
 #if TRACK_MAPPINGS
     char selector = get_sud();
-    assert(pthread_rwlock_wrlock(&lock)==0);
+    lock.lock();
     set_sud_allow();
     int ret = remove_page_locked(start, size, cid);
-    assert(pthread_rwlock_unlock(&lock)==0);
+    lock.unlock();
     (selector == SYSCALL_DISPATCH_FILTER_ALLOW) ? set_sud_allow() : set_sud_block();
     return ret;
 #else
@@ -423,10 +423,11 @@ int virt_page_manager::remove_page_map_fixed_locked(char* start, size_t size, in
 int virt_page_manager::update_mprotect(char* start, size_t size, int prot, int cid){
 #if TRACK_MAPPINGS
     char selector = get_sud();
-    assert(pthread_rwlock_wrlock(&lock)==0);
+    lock.lock();
     set_sud_allow();
     int ret = update_mprotect_locked(start, size, prot, cid);
-    assert(pthread_rwlock_unlock(&lock)==0);
+    lock.unlock();
+
     (selector == SYSCALL_DISPATCH_FILTER_ALLOW) ? set_sud_allow() : set_sud_block();
     return ret;
 #else
@@ -562,9 +563,9 @@ int virt_page_manager::update_size(char* start, size_t old_size, size_t new_size
 #if TRACK_MAPPINGS
     char selector = get_sud();
     set_sud_allow();
-    assert(pthread_rwlock_wrlock(&lock)==0);
+    lock.lock();
     int ret = update_size_locked(start, old_size, new_size, cid);
-    assert(pthread_rwlock_unlock(&lock)==0);
+    lock.unlock();
     (selector == SYSCALL_DISPATCH_FILTER_ALLOW) ? set_sud_allow() : set_sud_block();
     return ret;
 #else
@@ -629,9 +630,10 @@ struct virt_page* virt_page_manager::lookup_addr(char* addr, int cid){
 #if TRACK_MAPPINGS
     char selector = get_sud();
     set_sud_allow();
-    pthread_rwlock_rdlock(&lock);
+    lock.lock();
     struct virt_page* ret = lookup_addr_locked(addr, cid);
-    pthread_rwlock_unlock(&lock);
+    lock.unlock();
+
     (selector == SYSCALL_DISPATCH_FILTER_ALLOW) ? set_sud_allow() : set_sud_block();
     return ret;
 #else
@@ -643,9 +645,10 @@ struct virt_page* virt_page_manager::lookup_range(char* start_addr, size_t size,
 #if TRACK_MAPPINGS
     char selector = get_sud();
     set_sud_allow();
-    pthread_rwlock_rdlock(&lock);
+    lock.lock();
     struct virt_page* ret = lookup_range_locked(start_addr, size, cid);
-    pthread_rwlock_unlock(&lock);
+    lock.unlock();
+
     (selector == SYSCALL_DISPATCH_FILTER_ALLOW) ? set_sud_allow() : set_sud_block();
     return ret;
 #else
@@ -715,9 +718,9 @@ int virt_page_manager::lookup_range_allow_gaps(char* start_addr, size_t size, in
 #if TRACK_MAPPINGS
     char selector = get_sud();
     set_sud_allow();
-    pthread_rwlock_rdlock(&lock);
+    lock.lock();
     int ret = lookup_range_allow_gaps_locked(start_addr, size, cid);
-    pthread_rwlock_unlock(&lock);
+    lock.unlock();
     (selector == SYSCALL_DISPATCH_FILTER_ALLOW) ? set_sud_allow() : set_sud_block();
     return ret;
 #else

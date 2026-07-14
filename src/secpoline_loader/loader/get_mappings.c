@@ -35,8 +35,13 @@ struct mmapped_list_s* get_mappings(){
 
         if(strstr(line, "vvar")){
             mmapped_list.vvar.permissions = PROT_READ;
-            mmapped_list.vvar.start_address = mapping_start;
-            mmapped_list.vvar.size = mapping_end-mapping_start;
+            if(mmapped_list.vvar.start_address){
+                assert(mapping_start == mmapped_list.vvar.start_address + mmapped_list.vvar.size);
+                mmapped_list.vvar.size += mapping_end-mapping_start;
+            }else{
+                mmapped_list.vvar.start_address = mapping_start;
+                mmapped_list.vvar.size = mapping_end-mapping_start;
+            }
             continue;
         }
 

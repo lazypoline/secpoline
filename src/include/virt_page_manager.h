@@ -37,7 +37,7 @@ class virt_page_manager{
 
     private:
         struct virt_page* free_pages = NULL;
-        pthread_rwlock_t lock = PTHREAD_RWLOCK_INITIALIZER;
+        std::mutex lock;
 
         int add_page_locked(char* start, size_t size, int prot, int flags, int cid, bool map_fixed, struct virt_page* p1);
         int remove_page_locked(char* start, size_t size, int cid);
