@@ -66,7 +66,7 @@ SYSCALL_HANDLER(mmap){
     size_t size = ((gprs->arg2() + PAGE_SIZE - 1) / PAGE_SIZE) * PAGE_SIZE; //allign the size to page_size
     size_t prot = gprs->arg3();
     size_t flags = gprs->arg4();
-    size_t fd = gprs->arg5();
+    int fd = gprs->arg5();
     size_t offset = gprs->arg6();
 #if MMAP_LOCK
     assert(pthread_rwlock_wrlock(&mmap_lock) == 0);
@@ -469,7 +469,8 @@ SYSCALL_HANDLER(exit_group){
 #if DEBUG
     nolibc_print_size_t("exiting program", gprs->arg1());
 #endif
-    exit(gprs->arg1());
+    gprs->do_syscall();
+    //exit(gprs->arg1());
     assert(0);
 }
 

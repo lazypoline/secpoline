@@ -37,7 +37,7 @@ class virt_page_manager{
 
     private:
         struct virt_page* free_pages = NULL;
-        pthread_rwlock_t lock = PTHREAD_RWLOCK_INITIALIZER;
+        std::mutex lock;
 
         int add_page_locked(char* start, size_t size, int prot, int flags, int cid, bool map_fixed, struct virt_page* p1);
         int remove_page_locked(char* start, size_t size, int cid);
@@ -67,8 +67,8 @@ void scan_exec_mapping(char* start, size_t size, int prot, int unsafe_prot, int 
 void scan_exec_mapping_mprotect(char* start, size_t size, int prot, int unsafe_prot, int cid, std::vector<unsigned long long>* allow_list);
 char* handle_mremap(char* start, size_t old_size, size_t new_size, int flags, char* new_start, int cid);
 char* handle_mremap_exec(char* start, size_t old_size, size_t new_size, int flags, char* new_start, int prot, int cid);
-size_t secpoline_mmap(size_t start, size_t size, size_t prot, size_t flags, size_t fd, size_t offset, int cid);
-size_t map_file_baked(size_t start, size_t size, size_t prot, size_t flags, size_t fd, size_t offset, int cid);
+size_t secpoline_mmap(size_t start, size_t size, size_t prot, size_t flags, int fd, size_t offset, int cid);
+size_t map_file_baked(size_t start, size_t size, size_t prot, size_t flags, int fd, size_t offset, int cid);
 
 
 

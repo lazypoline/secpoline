@@ -11,7 +11,7 @@ extern void (*update_active_thread_list)(bool);
 int virual_clone_wrapper(size_t flags, size_t* child_stack, [[maybe_unused]] size_t ptid, size_t ctid, size_t tls){
     //printf("top of child stack: %llx[%p]\n", child_stack[0], child_stack);
     child_stack = child_stack - 2; //make space for &tls and &ctid
-    child_stack[0] = ctid;
+    child_stack[0] = ptid;
     child_stack[1] = tls;
     //printf("child stack[0]: %llx[%p]\n", child_stack[0], &child_stack[0]);
     //printf("child stack[1]: %llx[%p]\n", child_stack[1], &child_stack[1]);

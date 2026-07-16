@@ -7,7 +7,7 @@
 #include "mpk_isolation.h"
 
 //Do not call any outside code here as this code is shared between the meta monitor
-size_t secpoline_mmap(size_t start, size_t size, size_t prot, size_t flags, size_t fd, size_t offset, int cid){
+size_t secpoline_mmap(size_t start, size_t size, size_t prot, size_t flags, int fd, size_t offset, int cid){
     int key = get_pkey(cid);
     if(cid==TS_MONITOR) nolibc_assert(gsreldata->readable_data.sud_selector==SYSCALL_DISPATCH_FILTER_ALLOW);
     if(key == -1) return -EINVAL;
@@ -96,9 +96,10 @@ size_t secpoline_mmap(size_t start, size_t size, size_t prot, size_t flags, size
     return result;
 }
 
-size_t map_file_baked(size_t start, size_t size, size_t prot, size_t flags, size_t fd, size_t offset, int cid){
+size_t map_file_baked(size_t start, size_t size, size_t prot, size_t flags, int fd, size_t offset, int cid){
     //first map the page as writable
-    int64_t result = syscall_wrapper(__NR_mmap, start, size, PROT_WRITE|PROT_READ, flags, fd, offset, cid);
+    //TODO pkey_mprotect first in case key zero is not monitor owned
+    int64_t result = syscall_wrapper(__NR_mmap, start, size, PROT_WRITE|PROT_READ, flags|MAP_ANONYMOUS, -1, 0, cid);
     if(result < 0) return result;
 
 
@@ -112,7 +113,7 @@ size_t map_file_baked(size_t start, size_t size, size_t prot, size_t flags, size
     size_t readlen = 0;
     size_t curlen = 0;
     while(readlen < size) {
-        curlen = syscall_wrapper(__NR_read, fd, result+readlen, size - readlen, 0, 0, 0, cid);
+        curlen = inline_syscall6(__NR_read, fd, result+readlen, size - readlen, 0, 0, 0);
         assert(curlen >= 0);
         if(curlen == 0)
             break;

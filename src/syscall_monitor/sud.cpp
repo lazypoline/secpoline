@@ -62,7 +62,7 @@ private:
 extern "C" void handle_sigsys(int sig, siginfo_t *info, void *ucontextv, char compartment_id_on_entry) {
     nolibc_assert(gsreldata->readable_data.compartment_id == TS_MONITOR);
     // see the sigaction handling for more info
-    nolibc_assert(info->si_code == SYS_USER_DISPATCH && "SUD does not support safely running non-SUD SIGSYS handlers!");
+    nolibc_assert(info->si_code == SYS_USER_DISPATCH_INTERNAL && "SUD does not support safely running non-SUD SIGSYS handlers!");
     nolibc_assert(sig == SIGSYS);
 	nolibc_assert(info->si_signo == SIGSYS);
 	nolibc_assert(info->si_errno == 0);
