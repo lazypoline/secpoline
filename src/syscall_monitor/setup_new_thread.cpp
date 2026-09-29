@@ -209,6 +209,10 @@ extern "C" void setup_restore_selector_trampoline(void* ucontextv, void* secure_
         gregs[REG_RSP] = gregs[REG_R9];
     }
     
+    //backup the flags as they are clobbered by the restore trampoline
+    gsreldata->sigreturn_stack.current[0] = gregs[REG_EFL];
+    gsreldata->sigreturn_stack.current++;
+
     //backup rsp after sigreturn and replace it with secure stack
     gsreldata->sigreturn_stack.current[0] = gregs[REG_RSP];
     gsreldata->sigreturn_stack.current++;

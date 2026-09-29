@@ -51,6 +51,12 @@ restore_selector_trampoline:
     pushq %rdx
     pushq %rcx
 
+    /*save the flags for later*/
+    subq $8, %gs:SIGRETURN_STACK_SP_OFFSET
+    movq %gs:SIGRETURN_STACK_SP_OFFSET, %rax
+    movq (%rax), %rax
+    pushq %rax
+
     /*save the rip after sigreturn in gsrelative memory so we can still jump without using the stack or any registers*/
     subq $8, %gs:SIGRETURN_STACK_SP_OFFSET
     movq %gs:SIGRETURN_STACK_SP_OFFSET, %rax
@@ -111,6 +117,7 @@ restore_selector_trampoline:
 
 .end_of_sigreturn:
 
+    popfq
     popq %rcx
     popq %rdx
     popq %rax
